@@ -9,20 +9,21 @@ using System.Threading.Tasks;
 using System.Windows.Input;
 using D2G.Iris.ML.ConfigUI.WPF.Commands;
 using D2G.Iris.ML.ConfigUI.WPF.Services;
+using Microsoft.Data.SqlClient;
+using OutlierDetectionMethod = D2G.Iris.ML.ConfigUI.WPF.Services.OutlierDetectionMethod;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
-    public class OutlierDetectionViewModel : INotifyPropertyChanged
+    public class OutlierDetectionViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly IDialogService _dialogService;
-        private DataTable? _dataTable;
-        private string? _targetColumn;
+        private readonly IDatabaseAnalyticsService _databaseAnalytics;
         private ObservableCollection<OutlierDetectionResult> _outlierResults;
         private ObservableCollection<OutlierSummaryResult> _summaryResults;
+        private ObservableCollection<string> _availableColumns;
         private OutlierDetectionMethod _selectedMethod;
         private bool _isAnalyzing;
         private string _analysisMessage = string.Empty;
-        private ObservableCollection<string> _availableColumns;
         private bool _removeOutliersEnabled = false;
         private double _zScoreThreshold = 3.0;
         private double _iqrMultiplier = 1.5;
@@ -33,17 +34,27 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private bool _isApplyingWinsorization = false;
         private string _winsorizationProgress = string.Empty;
 
-        public OutlierDetectionViewModel(IDialogService dialogService)
+        // Database connection info
+        private string? _connectionString;
+        private string? _tableName;
+        private string[]? _columns;
+        private string? _targetColumn;
+        private string? _whereClause;
+        private string? _cleanedTableName; // For tracking cleaned data (always a view)
+        private bool _isViewCreated = false; // Track if we created a view
+
+        public OutlierDetectionViewModel(IDialogService dialogService, IDatabaseAnalyticsService databaseAnalytics)
         {
             _dialogService = dialogService;
+            _databaseAnalytics = databaseAnalytics;
             _outlierResults = new ObservableCollection<OutlierDetectionResult>();
             _summaryResults = new ObservableCollection<OutlierSummaryResult>();
             _availableColumns = new ObservableCollection<string>();
             _selectedMethod = OutlierDetectionMethod.ZScore;
-            
+
             DetectOutliersCommand = new AsyncRelayCommand(async _ => await DetectOutliersAsync());
             RemoveOutliersCommand = new AsyncRelayCommand(async _ => await RemoveOutliersAsync(), _ => CanRemoveOutliers());
-            ApplyWinsorizationCommand = new RelayCommand(_ => ApplyWinsorizationToData(), _ => CanRemoveOutliers());
+            ApplyWinsorizationCommand = new AsyncRelayCommand(async _ => await ApplyWinsorizationAsync(), _ => CanRemoveOutliers());
             SelectAllColumnsCommand = new RelayCommand(_ => SelectAllColumns(), _ => SummaryResults.Any());
             DeselectAllColumnsCommand = new RelayCommand(_ => DeselectAllColumns(), _ => SummaryResults.Any());
         }
@@ -66,6 +77,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _availableColumns;
             set => SetProperty(ref _availableColumns, value);
+        }
+
+        public IEnumerable<OutlierDetectionMethod> OutlierDetectionMethods
+        {
+            get => Enum.GetValues<OutlierDetectionMethod>();
         }
 
         public OutlierDetectionMethod SelectedMethod
@@ -91,7 +107,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             get => _zScoreThreshold;
             set => SetProperty(ref _zScoreThreshold, value);
         }
-        
+
         public double IQRMultiplier
         {
             get => _iqrMultiplier;
@@ -113,7 +129,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double WinsorLowerPercentile
         {
             get => _winsorLowerPercentile;
-            set 
+            set
             {
                 var clampedValue = Math.Max(0.1, Math.Min(value, 99.8));
                 SetProperty(ref _winsorLowerPercentile, clampedValue);
@@ -123,8 +139,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double WinsorUpperPercentile
         {
             get => _winsorUpperPercentile;
-            set 
-            { 
+            set
+            {
                 var clampedValue = Math.Max(0.2, Math.Min(value, 99.9));
                 SetProperty(ref _winsorUpperPercentile, clampedValue);
             }
@@ -148,7 +164,26 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _winsorizationProgress, value);
         }
 
-        public Array OutlierDetectionMethods => Enum.GetValues(typeof(OutlierDetectionMethod));
+        private double _winsorizationProgressPercentage;
+        public double WinsorizationProgressPercentage
+        {
+            get => _winsorizationProgressPercentage;
+            set => SetProperty(ref _winsorizationProgressPercentage, value);
+        }
+
+        private string _currentColumnBeingProcessed = string.Empty;
+        public string CurrentColumnBeingProcessed
+        {
+            get => _currentColumnBeingProcessed;
+            set => SetProperty(ref _currentColumnBeingProcessed, value);
+        }
+
+        private string _currentStepDescription = string.Empty;
+        public string CurrentStepDescription
+        {
+            get => _currentStepDescription;
+            set => SetProperty(ref _currentStepDescription, value);
+        }
 
         #endregion
 
@@ -164,29 +199,46 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Public Methods
 
-        public void SetDataTable(DataTable? dataTable, string? targetColumn = null)
+        public void SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? targetColumn, string? whereClause)
         {
-            _dataTable = dataTable;
+            _connectionString = connectionString;
+            _tableName = tableName;
+            _columns = columns;
             _targetColumn = targetColumn;
-            
-            
-            if (!string.IsNullOrEmpty(_targetColumn) && _dataTable != null && !_dataTable.Columns.Contains(_targetColumn))
-            {
-                _dialogService.ShowErrorDialog($"Target column '{_targetColumn}' not found in dataset. Available columns: {string.Join(", ", _dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}", "Target Column Error");
-                _targetColumn = null; 
-            }
-            
-            UpdateAvailableColumns();
-        }
+            _whereClause = whereClause;
+            _cleanedTableName = null; // Reset cleaned data state
 
-        public DataTable? GetCleanedDataTable()
-        {
-            return _dataTable;
+            UpdateAvailableColumns();
         }
 
         public bool HasOutliersBeenRemoved()
         {
-            return RemoveOutliersEnabled;
+            return !string.IsNullOrEmpty(_cleanedTableName) || RemoveOutliersEnabled;
+        }
+
+        public DatabaseDataInfo? GetCleanedDataInfo()
+        {
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || _columns == null)
+                return null;
+
+            return new DatabaseDataInfo
+            {
+                ConnectionString = _connectionString,
+                TableName = !string.IsNullOrEmpty(_cleanedTableName) ? _cleanedTableName : _tableName,
+                Columns = _columns,
+                WhereClause = _whereClause,
+                IsCleanedData = HasOutliersBeenRemoved()
+            };
+        }
+
+        public Microsoft.ML.IDataView? GetCleanedDataView()
+        {
+            return null; // Always use database view approach, never in-memory
+        }
+
+        public bool IsUsingInMemoryData()
+        {
+            return false; // Always use database view approach
         }
 
         public void SelectAllColumns()
@@ -204,15 +256,205 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 summary.IsSelectedForRemoval = false;
             }
         }
-       
 
-        public async void ApplyWinsorizationToData()
+        #endregion
+
+        #region Private Methods
+
+        private void UpdateAvailableColumns()
         {
-            if (_dataTable == null || !OutlierResults.Any())
+            AvailableColumns.Clear();
+
+            if (_columns == null) return;
+
+            foreach (var column in _columns)
             {
-                _dialogService.ShowErrorDialog("No data or outliers available for winsorization.", "Error");
+                if (!string.IsNullOrEmpty(_targetColumn) && column.Equals(_targetColumn, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                AvailableColumns.Add(column);
+            }
+        }
+
+        private bool CanRemoveOutliers()
+        {
+            return OutlierResults.Any() && !IsAnalyzing;
+        }
+
+        private async Task DetectOutliersAsync()
+        {
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || _columns == null)
+            {
+                _dialogService.ShowErrorDialog("Database connection not configured.", "Error");
                 return;
             }
+
+            try
+            {
+                IsAnalyzing = true;
+                AnalysisMessage = "Detecting outliers...";
+                OutlierResults.Clear();
+                SummaryResults.Clear();
+
+                var numericColumns = _columns.Where(c => !string.IsNullOrEmpty(_targetColumn) && !c.Equals(_targetColumn, StringComparison.OrdinalIgnoreCase)).ToArray();
+
+                if (!numericColumns.Any())
+                {
+                    _dialogService.ShowInfoDialog("No numeric columns available for outlier detection.", "Information");
+                    return;
+                }
+
+                foreach (var column in numericColumns)
+                {
+                    AnalysisMessage = $"Analyzing column: {column}...";
+                    await Task.Delay(50);
+
+                    var outliers = await _databaseAnalytics.DetectOutliersAsync(
+                        _connectionString, _tableName, column, SelectedMethod, GetThresholdForMethod(), _whereClause);
+
+                    var totalRows = await GetRowCountAsync(column);
+                    var outlierCount = outliers.Count;
+                    var percentage = totalRows > 0 ? (double)outlierCount / totalRows * 100 : 0;
+
+                    foreach (var outlier in outliers)
+                    {
+                        OutlierResults.Add(new OutlierDetectionResult
+                        {
+                            RowIndex = (int)outlier.RowId,
+                            Value = outlier.Value,
+                            Score = outlier.Score,
+                            Method = SelectedMethod.ToString(),
+                            ColumnName = column,
+                            Severity = CalculateSeverity(outlier.Score)
+                        });
+                    }
+
+                    SummaryResults.Add(new OutlierSummaryResult
+                    {
+                        ColumnName = column,
+                        TotalValues = (int)totalRows,
+                        OutlierCount = outlierCount,
+                        OutlierPercentage = percentage,
+                        Method = SelectedMethod.ToString(),
+                        MaxScore = outliers.Any() ? outliers.Max(o => o.Score) : 0,
+                        Status = GetColumnStatus(percentage)
+                    });
+                }
+
+                _dialogService.ShowInfoDialog($"Outlier detection completed. Found {OutlierResults.Count} outliers across {numericColumns.Length} columns.", "Analysis Complete");
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog($"Error detecting outliers: {ex.Message}", "Error");
+                Console.WriteLine($"Outlier detection error: {ex}");
+            }
+            finally
+            {
+                IsAnalyzing = false;
+                AnalysisMessage = string.Empty;
+            }
+        }
+
+        private async Task<long> GetRowCountAsync(string column)
+        {
+            try
+            {
+                var query = BuildRowCountQuery(_tableName!, column, _whereClause);
+                // Use a simple connection to execute the count query
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                using var command = new Microsoft.Data.SqlClient.SqlCommand(query, connection);
+                var result = await command.ExecuteScalarAsync();
+                return Convert.ToInt64(result);
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        private string BuildRowCountQuery(string tableName, string columnName, string? whereClause)
+        {
+            var whereCondition = !string.IsNullOrWhiteSpace(whereClause) ? $"WHERE ({whereClause}) AND" : "WHERE";
+            return $"SELECT COUNT(*) FROM {tableName} {whereCondition} [{columnName}] IS NOT NULL AND ISNUMERIC([{columnName}]) = 1";
+        }
+
+        private async Task RemoveOutliersAsync()
+        {
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || !OutlierResults.Any())
+            {
+                _dialogService.ShowErrorDialog("No outliers to remove.", "Error");
+                return;
+            }
+
+            var selectedColumns = SummaryResults
+                .Where(s => s.IsSelectedForRemoval)
+                .Select(s => s.ColumnName)
+                .ToHashSet();
+
+            if (!selectedColumns.Any())
+            {
+                _dialogService.ShowInfoDialog("Please select at least one column for outlier removal.", "No Columns Selected");
+                return;
+            }
+
+            try
+            {
+                IsAnalyzing = true;
+                AnalysisMessage = "Removing outliers from selected columns...";
+
+                _cleanedTableName = await CreateCleanedTableAsync(selectedColumns);
+
+                if (!string.IsNullOrEmpty(_cleanedTableName))
+                {
+                    _dialogService.ShowInfoDialog($"Outliers removed from {selectedColumns.Count} columns.", "Outliers Removed");
+
+                    OutlierResults.Clear();
+                    foreach (var summary in SummaryResults.Where(s => selectedColumns.Contains(s.ColumnName)))
+                    {
+                        summary.OutlierCount = 0;
+                        summary.OutlierPercentage = 0;
+                        summary.Status = "Cleaned";
+                        summary.IsSelectedForRemoval = false;
+                    }
+                    RemoveOutliersEnabled = true;
+                }
+                else
+                {
+                    _dialogService.ShowErrorDialog("Failed to remove outliers.", "Error");
+                }
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog($"Error removing outliers: {ex.Message}", "Error");
+                Console.WriteLine($"Outlier removal error: {ex}");
+            }
+            finally
+            {
+                IsAnalyzing = false;
+                AnalysisMessage = string.Empty;
+            }
+        }
+
+        private async Task ApplyWinsorizationAsync()
+        {
+            Console.WriteLine("=== WINSORIZATION STARTED ===");
+            System.Diagnostics.Debug.WriteLine("=== WINSORIZATION STARTED ===");
+
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || !OutlierResults.Any())
+            {
+                var error = "No data or outliers available for winsorization.";
+                Console.WriteLine($"ERROR: {error}");
+                System.Diagnostics.Debug.WriteLine($"ERROR: {error}");
+                _dialogService.ShowErrorDialog(error, "Error");
+                return;
+            }
+
+            Console.WriteLine($"Connection string (partial): {_connectionString?.Substring(0, Math.Min(50, _connectionString?.Length ?? 0))}...");
+            Console.WriteLine($"Table name: {_tableName}");
+            Console.WriteLine($"Outlier results count: {OutlierResults.Count}");
+            System.Diagnostics.Debug.WriteLine($"Table name: {_tableName}");
+            System.Diagnostics.Debug.WriteLine($"Outlier results count: {OutlierResults.Count}");
 
             var selectedColumns = SummaryResults
                 .Where(s => s.IsSelectedForRemoval)
@@ -228,370 +470,548 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 IsApplyingWinsorization = true;
-                WinsorizationProgress = "Applying winsorization to selected columns...";
-                await Task.Delay(100);
+                WinsorizationProgressPercentage = 0;
+                WinsorizationProgress = "Starting winsorization process...";
+                CurrentStepDescription = "Initializing winsorization";
+                CurrentColumnBeingProcessed = "";
 
-                var transformedCount = 0;
-                var totalColumns = selectedColumns.Count;
-                var currentColumn = 0;
+                // Use efficient view approach for all dataset sizes
+                var dataSize = await EstimateDataSizeAsync();
+                Console.WriteLine($"Estimated data size: {dataSize} rows");
+                Console.WriteLine("Using database view approach (zero storage overhead, scales to any size)");
 
-                foreach (var columnName in selectedColumns)
+                CurrentStepDescription = "Estimating dataset size";
+                WinsorizationProgressPercentage = 5;
+
+                _cleanedTableName = await CreateWinsorizedViewAsync(selectedColumns);
+                _isViewCreated = !string.IsNullOrEmpty(_cleanedTableName);
+
+                if (!string.IsNullOrEmpty(_cleanedTableName))
                 {
-                    currentColumn++;
-                    WinsorizationProgress = $"Processing column: {columnName} ({currentColumn}/{totalColumns})...";
-                    await Task.Delay(50);
+                    _dialogService.ShowInfoDialog($"Winsorization completed for {selectedColumns.Count} columns using database view approach.", "Winsorization Complete");
 
-                    var column = _dataTable.Columns[columnName];
-                    if (column == null || !IsNumericColumn(column)) continue;
-
-                    var values = ExtractNumericValues(column);
-                    if (values.Count < 4) continue;
-
-                    var sortedValues = values.Select(v => v.Value).OrderBy(x => x).ToList();
-                    var lowerBound = CalculatePercentile(sortedValues, WinsorLowerPercentile);
-                    var upperBound = CalculatePercentile(sortedValues, WinsorUpperPercentile);
-
-                    foreach (var value in values)
+                    OutlierResults.Clear();
+                    foreach (var summary in SummaryResults.Where(s => selectedColumns.Contains(s.ColumnName)))
                     {
-                        if (value.Value < lowerBound || value.Value > upperBound)
-                        {
-                            var winsorizedValue = value.Value < lowerBound ? lowerBound : upperBound;
-                            _dataTable.Rows[value.Index][columnName] = winsorizedValue;
-                            transformedCount++;
-                        }
+                        summary.OutlierCount = 0;
+                        summary.OutlierPercentage = 0;
+                        summary.Status = "Winsorized";
+                        summary.IsSelectedForRemoval = false;
                     }
+                    RemoveOutliersEnabled = true;
                 }
-
-                _dialogService.ShowInfoDialog($"Winsorization completed. {transformedCount} values were transformed.", "Winsorization Complete");
-                
-                OutlierResults.Clear();
-                foreach (var summary in SummaryResults.Where(s => selectedColumns.Contains(s.ColumnName)))
+                else
                 {
-                    summary.OutlierCount = 0;
-                    summary.OutlierPercentage = 0;
-                    summary.Status = "Winsorized";
-                    summary.IsSelectedForRemoval = false;
+                    _dialogService.ShowErrorDialog("Failed to apply winsorization.", "Error");
                 }
-                RemoveOutliersEnabled = true;
             }
             catch (Exception ex)
             {
                 _dialogService.ShowErrorDialog($"Error during winsorization: {ex.Message}", "Error");
+                Console.WriteLine($"Winsorization error: {ex}");
             }
             finally
             {
                 IsApplyingWinsorization = false;
                 WinsorizationProgress = string.Empty;
+                WinsorizationProgressPercentage = 0;
+                CurrentStepDescription = string.Empty;
+                CurrentColumnBeingProcessed = string.Empty;
             }
         }
 
-        #endregion
-
-        #region Private Methods
-
-        private void UpdateAvailableColumns()
+        private async Task<string?> CreateCleanedTableAsync(HashSet<string> selectedColumns)
         {
-            AvailableColumns.Clear();
-            
-            if (_dataTable == null) return;
-
-            var numericColumns = _dataTable.Columns.Cast<DataColumn>()
-                .Where(c => IsNumericColumn(c) && !IsTargetColumn(c.ColumnName))
-                .Select(c => c.ColumnName)
-                .OrderBy(name => name);
-
-            foreach (var columnName in numericColumns)
-            {
-                AvailableColumns.Add(columnName);
-            }
-        }
-
-        private bool IsTargetColumn(string columnName)
-        {
-            return !string.IsNullOrEmpty(_targetColumn) && 
-                   columnName.Equals(_targetColumn, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private bool IsNumericColumn(DataColumn column)
-        {
-            return column.DataType == typeof(int) ||
-                   column.DataType == typeof(long) ||
-                   column.DataType == typeof(short) ||
-                   column.DataType == typeof(byte) ||
-                   column.DataType == typeof(float) ||
-                   column.DataType == typeof(double) ||
-                   column.DataType == typeof(decimal);
-        }
-
-        private async Task DetectOutliersAsync()
-        {
-            if (_dataTable == null)
-            {
-                _dialogService.ShowErrorDialog("No data available for outlier detection.", "Error");
-                return;
-            }
-
             try
             {
-                IsAnalyzing = true;
-                AnalysisMessage = "Detecting outliers across all numeric columns...";
-                OutlierResults.Clear();
-                SummaryResults.Clear();
-
-                await Task.Delay(100);
-
-                var numericColumns = _dataTable.Columns.Cast<DataColumn>()
-                    .Where(c => IsNumericColumn(c) && !IsTargetColumn(c.ColumnName))
+                var tempTableName = $"#CleanedData_{Guid.NewGuid():N}";
+                var outlierRowIds = OutlierResults
+                    .Where(r => selectedColumns.Contains(r.ColumnName))
+                    .Select(r => r.RowIndex)
+                    .Distinct()
                     .ToList();
 
-                if (!numericColumns.Any())
-                {
-                    _dialogService.ShowInfoDialog("No numeric columns found for outlier analysis.", "Information");
-                    return;
-                }
+                if (!outlierRowIds.Any())
+                    return null;
 
-                
-                var columnNames = string.Join(", ", numericColumns.Select(c => c.ColumnName));
-                Console.WriteLine($"Analyzing columns for outliers: {columnNames}");
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    Console.WriteLine($"Target column '{_targetColumn}' excluded from outlier analysis.");
-                }
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"AND ({_whereClause})";
+                var outlierCondition = string.Join(",", outlierRowIds);
 
-                AnalysisMessage = $"Analyzing {numericColumns.Count} numeric columns using {SelectedMethod}...";
-                await Task.Delay(100);
+                var sql = $@"
+                    SELECT *
+                    INTO {tempTableName}
+                    FROM (
+                        SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) as __RowId
+                        FROM {_tableName}
+                        WHERE 1=1 {whereCondition}
+                    ) t
+                    WHERE __RowId NOT IN ({outlierCondition})";
 
-                var totalOutliers = 0;
-                var totalValues = 0;
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync();
 
-                foreach (var column in numericColumns)
-                {
-                    AnalysisMessage = $"Processing column: {column.ColumnName}...";
-                    await Task.Delay(50);
+                using var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection);
+                await command.ExecuteNonQueryAsync();
 
-                    var values = ExtractNumericValues(column);
-                    if (!values.Any()) continue;
-
-                    var outliers = SelectedMethod switch
-                    {
-                        OutlierDetectionMethod.ZScore => DetectZScoreOutliers(values),
-                        OutlierDetectionMethod.IQR => DetectIQROutliers(values),
-                        OutlierDetectionMethod.ModifiedZScore => DetectModifiedZScoreOutliers(values),
-                        _ => new List<OutlierInfo>()
-                    };
-
-                    
-                    foreach (var outlier in outliers.OrderByDescending(o => Math.Abs(o.Score)))
-                    {
-                        OutlierResults.Add(new OutlierDetectionResult
-                        {
-                            RowIndex = outlier.Index,
-                            Value = outlier.Value,
-                            Score = outlier.Score,
-                            Method = SelectedMethod.ToString(),
-                            ColumnName = column.ColumnName,
-                            Severity = CalculateSeverity(outlier.Score)
-                        });
-                    }
-
-                    
-                    var outlierCount = outliers.Count;
-                    var valueCount = values.Count;
-                    var percentage = valueCount > 0 ? (double)outlierCount / valueCount * 100 : 0;
-                    
-                    var severityCounts = outliers.GroupBy(o => CalculateSeverity(o.Score))
-                        .ToDictionary(g => g.Key, g => g.Count());
-
-                    SummaryResults.Add(new OutlierSummaryResult
-                    {
-                        ColumnName = column.ColumnName,
-                        TotalValues = valueCount,
-                        OutlierCount = outlierCount,
-                        OutlierPercentage = percentage,
-                        Method = SelectedMethod.ToString(),
-                        LowSeverityCount = severityCounts.GetValueOrDefault("Low", 0),
-                        MediumSeverityCount = severityCounts.GetValueOrDefault("Medium", 0),
-                        HighSeverityCount = severityCounts.GetValueOrDefault("High", 0),
-                        ExtremeSeverityCount = severityCounts.GetValueOrDefault("Extreme", 0),
-                        MaxScore = outliers.Any() ? outliers.Max(o => o.Score) : 0,
-                        Status = GetColumnStatus(percentage)
-                    });
-
-                    totalOutliers += outlierCount;
-                    totalValues += valueCount;
-                }
-
-                var overallPercentage = totalValues > 0 ? (double)totalOutliers / totalValues * 100 : 0;
-
-                _dialogService.ShowInfoDialog(
-                    $"Outlier detection completed for {numericColumns.Count} columns.\n\n" +
-                    $"Found {totalOutliers} outliers out of {totalValues} total values ({overallPercentage:F2}%).\n\n" +
-                    $"Check the Summary tab for detailed column-wise results.",
-                    "Analysis Complete");
+                return tempTableName;
             }
             catch (Exception ex)
             {
-                _dialogService.ShowErrorDialog($"Error detecting outliers: {ex.Message}", "Analysis Error");
-            }
-            finally
-            {
-                IsAnalyzing = false;
-                AnalysisMessage = string.Empty;
+                Console.WriteLine($"Error creating cleaned table: {ex}");
+                return null;
             }
         }
 
-        private List<ValueInfo> ExtractNumericValues(DataColumn column)
+        private async Task<string?> CreateWinsorizedTableAsync(HashSet<string> selectedColumns)
         {
-            var totalRows = _dataTable!.Rows.Count;
-            var values = new List<ValueInfo>(totalRows);
+            var tempTableName = $"#WinsorizedData_{Guid.NewGuid():N}";
 
-            
-            for (int i = 0; i < totalRows; i++)
+            try
             {
-                var value = _dataTable.Rows[i][column];
-                if (value != null && value != DBNull.Value)
+                // Validate inputs
+                if (selectedColumns == null || !selectedColumns.Any())
                 {
-                    if (double.TryParse(value.ToString(), out double numericValue))
+                    throw new ArgumentException("No columns selected for winsorization");
+                }
+
+                if (_columns == null || !_columns.Any())
+                {
+                    throw new ArgumentException("No columns available in the dataset");
+                }
+
+                if (string.IsNullOrEmpty(_connectionString))
+                {
+                    throw new ArgumentException("Database connection string is not set");
+                }
+
+                if (string.IsNullOrEmpty(_tableName))
+                {
+                    throw new ArgumentException("Table name is not set");
+                }
+
+
+
+                // Validate that we have enough data for processing
+                if (!selectedColumns.Any())
+                {
+                    throw new ArgumentException("No columns selected for winsorization");
+                }
+
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
+
+                // Use a two-step approach: first create a simple copy, then update with winsorization
+                // This avoids complex SQL that might cause exceptions
+
+                // Step 1: Create a simple copy of the table
+                var createTableSql = $@"
+SELECT *
+INTO {tempTableName}
+FROM {_tableName}
+{whereCondition}";
+
+                // Step 2: Build update statements for each selected column
+                var updateStatements = new List<string>();
+                foreach (var column in selectedColumns)
+                {
+                    var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+                    var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
+
+                    var lowerPercentileQuery = $@"
+                        (SELECT TOP 1 PERCENTILE_CONT({WinsorLowerPercentile / 100.0})
+                         WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER()
+                         FROM {_tableName}
+                         WHERE {fullCondition})";
+
+                    var upperPercentileQuery = $@"
+                        (SELECT TOP 1 PERCENTILE_CONT({WinsorUpperPercentile / 100.0})
+                         WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER()
+                         FROM {_tableName}
+                         WHERE {fullCondition})";
+
+                    updateStatements.Add($@"
+UPDATE {tempTableName}
+SET [{column}] = CASE
+    WHEN CAST([{column}] AS FLOAT) < {lowerPercentileQuery} THEN {lowerPercentileQuery}
+    WHEN CAST([{column}] AS FLOAT) > {upperPercentileQuery} THEN {upperPercentileQuery}
+    ELSE CAST([{column}] AS FLOAT)
+END
+WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
+                }
+
+                Console.WriteLine($"=== Winsorisation SQL Debug ===");
+                Console.WriteLine($"Selected columns: {string.Join(", ", selectedColumns)}");
+                Console.WriteLine($"Table name: {_tableName}");
+                Console.WriteLine($"Where clause: '{_whereClause}'");
+                Console.WriteLine($"Connection string: {_connectionString?.Substring(0, Math.Min(50, _connectionString?.Length ?? 0))}...");
+                Console.WriteLine($"Selected columns for winsorization: {selectedColumns.Count}");
+                Console.WriteLine($"Update statements count: {updateStatements.Count}");
+                Console.WriteLine($"Temp table name: {tempTableName}");
+                Console.WriteLine($"WinsorLowerPercentile: {WinsorLowerPercentile}");
+                Console.WriteLine($"WinsorUpperPercentile: {WinsorUpperPercentile}");
+                Console.WriteLine($"Create table SQL:\n{createTableSql}");
+
+                // Validate the create table SQL
+                if (string.IsNullOrWhiteSpace(createTableSql) || !createTableSql.Contains("SELECT") || !createTableSql.Contains("INTO"))
+                {
+                    Console.WriteLine("ERROR: Invalid create table SQL generated!");
+                    throw new ArgumentException("Invalid create table SQL generated");
+                }
+
+                Console.WriteLine($"================================");
+
+                Console.WriteLine("Attempting to open database connection...");
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+
+                try
+                {
+                    await connection.OpenAsync();
+                    Console.WriteLine($"Database connection opened successfully. State: {connection.State}");
+                }
+                catch (Exception connEx)
+                {
+                    Console.WriteLine($"Failed to open database connection: {connEx.GetType().Name} - {connEx.Message}");
+                    throw new InvalidOperationException($"Database connection failed: {connEx.Message}", connEx);
+                }
+
+                // Execute each statement separately to avoid multi-statement issues
+                try
+                {
+                    // Step 1: Create the table copy
+                    Console.WriteLine("Executing table creation...");
+                    using (var createCommand = new Microsoft.Data.SqlClient.SqlCommand(createTableSql, connection))
                     {
-                        values.Add(new ValueInfo { Index = i, Value = numericValue });
+                        createCommand.CommandTimeout = 60;
+                        await createCommand.ExecuteNonQueryAsync();
+                    }
+                    Console.WriteLine("Table creation completed successfully.");
+
+                    // Verify the table was created and has data
+                    Console.WriteLine("Verifying table creation...");
+                    using (var verifyCommand = new Microsoft.Data.SqlClient.SqlCommand($"SELECT COUNT(*) FROM {tempTableName}", connection))
+                    {
+                        verifyCommand.CommandTimeout = 30;
+                        var rowCount = await verifyCommand.ExecuteScalarAsync();
+                        Console.WriteLine($"Temporary table {tempTableName} created with {rowCount} rows.");
+
+                        if (Convert.ToInt32(rowCount) == 0)
+                        {
+                            Console.WriteLine("WARNING: Temporary table was created but contains no data!");
+                        }
+                    }
+
+                    // Step 2: Execute each update statement
+                    var selectedColumnsList = selectedColumns.ToList();
+
+                    if (updateStatements.Count != selectedColumnsList.Count)
+                    {
+                        throw new InvalidOperationException($"Mismatch between update statements ({updateStatements.Count}) and selected columns ({selectedColumnsList.Count})");
+                    }
+
+                    for (int i = 0; i < updateStatements.Count; i++)
+                    {
+                        var updateSql = updateStatements[i];
+                        var columnName = selectedColumnsList[i];
+
+                        Console.WriteLine($"Executing update statement {i + 1}/{updateStatements.Count} for column {columnName}...");
+
+                        // Validate the update SQL
+                        if (string.IsNullOrWhiteSpace(updateSql) || !updateSql.Contains("UPDATE") || !updateSql.Contains(columnName))
+                        {
+                            Console.WriteLine($"ERROR: Invalid update SQL for column {columnName}!");
+                            throw new ArgumentException($"Invalid update SQL generated for column {columnName}");
+                        }
+
+                        Console.WriteLine($"Update SQL:\n{updateSql}");
+
+                        try
+                        {
+                            using (var updateCommand = new Microsoft.Data.SqlClient.SqlCommand(updateSql, connection))
+                            {
+                                updateCommand.CommandTimeout = 60;
+                                var rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                                Console.WriteLine($"Update completed for column {columnName}. Rows affected: {rowsAffected}");
+                            }
+                        }
+                        catch (Exception updateEx)
+                        {
+                            Console.WriteLine($"ERROR during update of column {columnName}: {updateEx.GetType().Name} - {updateEx.Message}");
+                            Console.WriteLine($"Failed SQL:\n{updateSql}");
+                            throw new InvalidOperationException($"Failed to update column {columnName}: {updateEx.Message}", updateEx);
+                        }
+                    }
+                    Console.WriteLine("All winsorization updates completed successfully.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error during winsorization execution: {ex.GetType().Name} - {ex.Message}");
+
+                    // Try to clean up the temp table if it was created
+                    try
+                    {
+                        using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand($"IF OBJECT_ID('{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}", connection);
+                        dropCommand.CommandTimeout = 30;
+                        await dropCommand.ExecuteNonQueryAsync();
+                        Console.WriteLine("Cleaned up temporary table after error.");
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        Console.WriteLine($"Could not clean up temporary table: {cleanupEx.Message}");
+                    }
+
+                    throw; // Re-throw the original exception
+                }
+
+                return tempTableName;
+            }
+            catch (Exception ex)
+            {
+                var error = $"Error creating winsorized table: {ex.GetType().Name} - {ex.Message}";
+                Console.WriteLine(error);
+                System.Diagnostics.Debug.WriteLine(error);
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    var innerError = $"Inner exception: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}";
+                    Console.WriteLine(innerError);
+                    System.Diagnostics.Debug.WriteLine(innerError);
+                }
+
+                Console.WriteLine("Attempting fallback winsorization approach...");
+                try
+                {
+                    return await CreateWinsorizedTableFallbackAsync(selectedColumns);
+                }
+                catch (Exception fallbackEx)
+                {
+                    Console.WriteLine($"Fallback approach also failed: {fallbackEx.GetType().Name} - {fallbackEx.Message}");
+
+                    Console.WriteLine("Running basic database diagnostics...");
+                    await RunDatabaseDiagnosticsAsync();
+
+                    Console.WriteLine("All winsorization approaches failed. The issue may be:");
+                    Console.WriteLine("1. Database permissions (cannot create temporary tables)");
+                    Console.WriteLine("2. Connection string issues");
+                    Console.WriteLine("3. SQL Server version compatibility");
+                    Console.WriteLine("4. Insufficient database privileges");
+
+                    return null;
+                }
+            }
+        }
+
+        private async Task<string?> CreateWinsorizedTableFallbackAsync(HashSet<string> selectedColumns)
+        {
+            Console.WriteLine("=== FALLBACK Winsorization Approach ===");
+            var tempTableName = $"#WinsorizedData_Fallback_{Guid.NewGuid():N}";
+
+            try
+            {
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync();
+                Console.WriteLine("Fallback: Database connection opened successfully.");
+
+                // Step 1: Create a simple copy without any complex operations
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
+                var createTableSql = $"SELECT * INTO {tempTableName} FROM {_tableName} {whereCondition}";
+
+                Console.WriteLine($"Fallback: Creating table copy...\nSQL: {createTableSql}");
+                using (var createCommand = new Microsoft.Data.SqlClient.SqlCommand(createTableSql, connection))
+                {
+                    createCommand.CommandTimeout = 60;
+                    await createCommand.ExecuteNonQueryAsync();
+                }
+                Console.WriteLine("Fallback: Table copy created successfully.");
+
+                // Step 2: For each selected column, use a very simple update approach
+                foreach (var column in selectedColumns)
+                {
+                    Console.WriteLine($"Fallback: Processing column {column}...");
+
+                    // Calculate percentiles using simple queries
+                    var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+                    var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
+
+                    // Get percentiles using OVER clause (required for this SQL Server version)
+                    var percentilesSql = $@"
+                        SELECT DISTINCT
+                            PERCENTILE_CONT({WinsorLowerPercentile / 100.0}) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as LowerBound,
+                            PERCENTILE_CONT({WinsorUpperPercentile / 100.0}) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as UpperBound
+                        FROM {_tableName}
+                        WHERE {fullCondition}";
+
+                    Console.WriteLine($"Fallback: Calculating percentiles for {column}...\nSQL: {percentilesSql}");
+                    System.Diagnostics.Debug.WriteLine($"Fallback: Percentiles SQL for {column}: {percentilesSql}");
+
+                    decimal lowerBound = 0, upperBound = 0;
+                    using (var percentilesCommand = new Microsoft.Data.SqlClient.SqlCommand(percentilesSql, connection))
+                    {
+                        percentilesCommand.CommandTimeout = 30;
+                        using var reader = await percentilesCommand.ExecuteReaderAsync();
+                        if (await reader.ReadAsync())
+                        {
+                            lowerBound = Convert.ToDecimal(reader["LowerBound"]);
+                            upperBound = Convert.ToDecimal(reader["UpperBound"]);
+                        }
+                    }
+
+                    Console.WriteLine($"Fallback: Column {column} bounds: Lower={lowerBound}, Upper={upperBound}");
+
+                    // Apply winsorization with simple updates
+                    var updateLowerSql = $@"
+                        UPDATE {tempTableName}
+                        SET [{column}] = {lowerBound}
+                        WHERE CAST([{column}] AS FLOAT) < {lowerBound}
+                        AND [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+
+                    var updateUpperSql = $@"
+                        UPDATE {tempTableName}
+                        SET [{column}] = {upperBound}
+                        WHERE CAST([{column}] AS FLOAT) > {upperBound}
+                        AND [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+
+                    // Execute lower bound update
+                    using (var updateLowerCommand = new Microsoft.Data.SqlClient.SqlCommand(updateLowerSql, connection))
+                    {
+                        updateLowerCommand.CommandTimeout = 30;
+                        var rowsAffected = await updateLowerCommand.ExecuteNonQueryAsync();
+                        Console.WriteLine($"Fallback: Updated {rowsAffected} rows for lower bound on column {column}");
+                    }
+
+                    // Execute upper bound update
+                    using (var updateUpperCommand = new Microsoft.Data.SqlClient.SqlCommand(updateUpperSql, connection))
+                    {
+                        updateUpperCommand.CommandTimeout = 30;
+                        var rowsAffected = await updateUpperCommand.ExecuteNonQueryAsync();
+                        Console.WriteLine($"Fallback: Updated {rowsAffected} rows for upper bound on column {column}");
                     }
                 }
-            }
 
-            return values;
+                Console.WriteLine("Fallback: Winsorization completed successfully!");
+                return tempTableName;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Fallback method error: {ex.GetType().Name} - {ex.Message}");
+                return null;
+            }
         }
 
-        private List<OutlierInfo> DetectZScoreOutliers(List<ValueInfo> values)
+        private async Task RunDatabaseDiagnosticsAsync()
         {
-            var outliers = new List<OutlierInfo>(values.Count / 10); 
-
-            if (values.Count < 2) return outliers;
-
-            var mean = values.Average(v => v.Value);
-            var variance = values.Sum(v => Math.Pow(v.Value - mean, 2)) / values.Count;
-            var standardDeviation = Math.Sqrt(variance);
-
-            if (standardDeviation == 0) return outliers;
-
-            foreach (var value in values)
+            try
             {
-                var zScore = Math.Abs(value.Value - mean) / standardDeviation;
-                if (zScore > ZScoreThreshold)
+                Console.WriteLine("=== DATABASE DIAGNOSTICS ===");
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+
+                // Test 1: Basic connection
+                Console.WriteLine("Test 1: Testing basic database connection...");
+                try
                 {
-                    outliers.Add(new OutlierInfo
-                    {
-                        Index = value.Index,
-                        Value = value.Value,
-                        Score = zScore
-                    });
+                    await connection.OpenAsync();
+                    Console.WriteLine($"✓ Connection successful. State: {connection.State}");
+                    Console.WriteLine($"✓ Database: {connection.Database}");
+                    Console.WriteLine($"✓ Server: {connection.DataSource}");
                 }
-            }
-
-            return outliers;
-        }
-
-        private List<OutlierInfo> DetectIQROutliers(List<ValueInfo> values)
-        {
-            var outliers = new List<OutlierInfo>(values.Count / 10); 
-
-            if (values.Count < 4) return outliers;
-
-            var sortedValues = values.OrderBy(v => v.Value).ToList();
-            var q1 = CalculatePercentile(sortedValues.Select(v => v.Value).ToList(), 25);
-            var q3 = CalculatePercentile(sortedValues.Select(v => v.Value).ToList(), 75);
-            var iqr = q3 - q1;
-
-            if (iqr == 0) return outliers;
-
-            var lowerBound = q1 - (IQRMultiplier * iqr);
-            var upperBound = q3 + (IQRMultiplier * iqr);
-
-            foreach (var value in values)
-            {
-                if (value.Value < lowerBound || value.Value > upperBound)
+                catch (Exception connEx)
                 {
-                    var score = value.Value < lowerBound 
-                        ? (lowerBound - value.Value) / iqr
-                        : (value.Value - upperBound) / iqr;
-                    
-                    outliers.Add(new OutlierInfo
-                    {
-                        Index = value.Index,
-                        Value = value.Value,
-                        Score = score
-                    });
+                    Console.WriteLine($"✗ Connection failed: {connEx.Message}");
+                    return;
                 }
-            }
 
-            return outliers;
-        }
-
-        private List<OutlierInfo> DetectModifiedZScoreOutliers(List<ValueInfo> values)
-        {
-            var outliers = new List<OutlierInfo>(values.Count / 10); 
-
-            if (values.Count < 2) return outliers;
-
-            var median = CalculateMedian(values.Select(v => v.Value).ToList());
-            var deviations = values.Select(v => Math.Abs(v.Value - median)).ToList();
-            var mad = CalculateMedian(deviations);
-
-            if (mad == 0) return outliers;
-
-            var threshold = ModifiedZScoreThreshold;
-            
-            foreach (var value in values)
-            {
-                var modifiedZScore = 0.6745 * (value.Value - median) / mad;
-                if (Math.Abs(modifiedZScore) > threshold)
+                // Test 2: Check if table exists and is accessible
+                Console.WriteLine($"Test 2: Testing table access for '{_tableName}'...");
+                try
                 {
-                    outliers.Add(new OutlierInfo
-                    {
-                        Index = value.Index,
-                        Value = value.Value,
-                        Score = Math.Abs(modifiedZScore)
-                    });
+                    var checkTableSql = $"SELECT COUNT(*) FROM {_tableName} WHERE 1=0";
+                    using var checkCommand = new Microsoft.Data.SqlClient.SqlCommand(checkTableSql, connection);
+                    checkCommand.CommandTimeout = 10;
+                    await checkCommand.ExecuteScalarAsync();
+                    Console.WriteLine($"✓ Table '{_tableName}' is accessible");
                 }
+                catch (Exception tableEx)
+                {
+                    Console.WriteLine($"✗ Table access failed: {tableEx.Message}");
+                }
+
+                // Test 3: Check PERCENTILE_CONT support
+                Console.WriteLine("Test 3: Testing PERCENTILE_CONT function support...");
+                try
+                {
+                    var percentileTestSql = $"SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY val) OVER() FROM (SELECT 1 as val) t";
+                    using var percentileCommand = new Microsoft.Data.SqlClient.SqlCommand(percentileTestSql, connection);
+                    percentileCommand.CommandTimeout = 10;
+                    await percentileCommand.ExecuteScalarAsync();
+                    Console.WriteLine("✓ PERCENTILE_CONT function is supported");
+                }
+                catch (Exception percentileEx)
+                {
+                    Console.WriteLine($"✗ PERCENTILE_CONT failed: {percentileEx.Message}");
+                }
+
+                // Test 4: Check temporary table creation permissions
+                Console.WriteLine("Test 4: Testing temporary table creation permissions...");
+                try
+                {
+                    var tempTableName = $"#TestTable_{Guid.NewGuid():N}";
+                    var createTempSql = $"CREATE TABLE {tempTableName} (id int)";
+                    using var createTempCommand = new Microsoft.Data.SqlClient.SqlCommand(createTempSql, connection);
+                    createTempCommand.CommandTimeout = 10;
+                    await createTempCommand.ExecuteNonQueryAsync();
+
+                    // Clean up
+                    var dropTempSql = $"DROP TABLE {tempTableName}";
+                    using var dropTempCommand = new Microsoft.Data.SqlClient.SqlCommand(dropTempSql, connection);
+                    await dropTempCommand.ExecuteNonQueryAsync();
+
+                    Console.WriteLine("✓ Temporary table creation is allowed");
+                }
+                catch (Exception tempEx)
+                {
+                    Console.WriteLine($"✗ Temporary table creation failed: {tempEx.Message}");
+                    Console.WriteLine("This is likely the cause of the winsorization failures.");
+                }
+
+                // Test 5: Check SELECT INTO permissions
+                Console.WriteLine("Test 5: Testing SELECT INTO permissions...");
+                try
+                {
+                    var tempTableName = $"#TestSelectInto_{Guid.NewGuid():N}";
+                    var selectIntoSql = $"SELECT TOP 1 * INTO {tempTableName} FROM {_tableName}";
+                    using var selectIntoCommand = new Microsoft.Data.SqlClient.SqlCommand(selectIntoSql, connection);
+                    selectIntoCommand.CommandTimeout = 10;
+                    await selectIntoCommand.ExecuteNonQueryAsync();
+
+                    // Clean up
+                    var dropSql = $"DROP TABLE {tempTableName}";
+                    using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand(dropSql, connection);
+                    await dropCommand.ExecuteNonQueryAsync();
+
+                    Console.WriteLine("✓ SELECT INTO is allowed");
+                }
+                catch (Exception selectIntoEx)
+                {
+                    Console.WriteLine($"✗ SELECT INTO failed: {selectIntoEx.Message}");
+                    Console.WriteLine("This is likely the cause of the winsorization failures.");
+                }
+
+                Console.WriteLine("=== DIAGNOSTICS COMPLETE ===");
             }
-
-            return outliers;
-        }
-
-
-        private double CalculatePercentile(List<double> sortedValues, double percentile)
-        {
-            if (!sortedValues.Any()) return 0;
-            
-            var n = sortedValues.Count;
-            if (n == 1) return sortedValues[0];
-            
-            var index = percentile / 100.0 * (n - 1);
-            
-            if (index <= 0) return sortedValues[0];
-            if (index >= n - 1) return sortedValues[n - 1];
-            
-            if (index == Math.Floor(index))
+            catch (Exception diagEx)
             {
-                return sortedValues[(int)index];
+                Console.WriteLine($"Diagnostics failed: {diagEx.Message}");
             }
-            
-            var lower = (int)Math.Floor(index);
-            var upper = (int)Math.Ceiling(index);
-            var weight = index - lower;
-            
-            return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
         }
 
-        private double CalculateMedian(List<double> values)
+        private double GetThresholdForMethod()
         {
-            if (!values.Any()) return 0;
-            
-            var sorted = values.OrderBy(x => x).ToList();
-            var n = sorted.Count;
-            
-            return n % 2 == 0
-                ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
-                : sorted[n / 2];
+            return SelectedMethod switch
+            {
+                OutlierDetectionMethod.ZScore => ZScoreThreshold,
+                OutlierDetectionMethod.IQR => IQRMultiplier,
+                OutlierDetectionMethod.ModifiedZScore => ModifiedZScoreThreshold,
+                _ => 3.0
+            };
         }
 
         private string CalculateSeverity(double score)
@@ -616,275 +1036,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             };
         }
 
-        private bool CanRemoveOutliers()
-        {
-            return OutlierResults.Any() && !IsAnalyzing;
-        }
-
-        private async Task RemoveOutliersAsync()
-        {
-            if (_dataTable == null || !OutlierResults.Any())
-            {
-                _dialogService.ShowErrorDialog("No outliers to remove.", "Error");
-                return;
-            }
-
-            
-            var selectedColumns = SummaryResults
-                .Where(s => s.IsSelectedForRemoval)
-                .Select(s => s.ColumnName)
-                .ToHashSet();
-
-            if (!selectedColumns.Any())
-            {
-                _dialogService.ShowInfoDialog("Please select at least one column for outlier removal.", "No Columns Selected");
-                return;
-            }
-
-            
-            if (ApplyWinsorization)
-            {
-                ApplyWinsorizationToData();
-                return;
-            }
-
-            try
-            {
-                IsAnalyzing = true;
-                AnalysisMessage = "Analyzing selected columns for outlier removal...";
-
-                await Task.Delay(100);
-
-                
-                Console.WriteLine("=== SELECTIVE OUTLIER REMOVAL ===");
-                Console.WriteLine($"Selected columns: {string.Join(", ", selectedColumns)}");
-                Console.WriteLine($"DataTable Columns ({_dataTable.Columns.Count}):");
-                foreach (DataColumn col in _dataTable.Columns)
-                {
-                    Console.WriteLine($"  - {col.ColumnName} ({col.DataType.Name})");
-                }
-
-                Console.WriteLine($"Target Column Name: '{_targetColumn}'");
-                Console.WriteLine($"Target Column Exists: {!string.IsNullOrEmpty(_targetColumn) && _dataTable.Columns.Contains(_targetColumn)}");
-
-                
-                var targetValueCounts = new Dictionary<string, int>();
-                int nullCount = 0;
-
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    var targetCol = _dataTable.Columns[_targetColumn];
-                    if (targetCol != null)
-                    {
-                        Console.WriteLine($"Target Column Type: {targetCol.DataType.Name}");
-                    }
-
-                    
-                    foreach (DataRow row in _dataTable.Rows)
-                    {
-                        var value = row[_targetColumn];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            nullCount++;
-                        }
-                        else
-                        {
-                            var stringValue = value.ToString() ?? string.Empty;
-                            targetValueCounts[stringValue] = targetValueCounts.ContainsKey(stringValue)
-                                ? targetValueCounts[stringValue] + 1 : 1;
-                        }
-                    }
-
-                    Console.WriteLine($"Target column distribution (before removal):");
-                    Console.WriteLine($"  NULL/DBNull values: {nullCount}");
-                    foreach (var kvp in targetValueCounts.OrderByDescending(x => x.Value))
-                    {
-                        Console.WriteLine($"  '{kvp.Key}': {kvp.Value:N0} samples");
-                    }
-                }
-
-                
-                var selectedOutliers = OutlierResults
-                    .Where(r => selectedColumns.Contains(r.ColumnName))
-                    .ToList();
-
-                var rowIndicesToRemove = selectedOutliers
-                    .Select(r => r.RowIndex)
-                    .Distinct()
-                    .OrderBy(i => i)
-                    .ToList();
-
-                Console.WriteLine($"Selected columns outliers: {selectedOutliers.Count:N0}");
-                Console.WriteLine($"Total rows to remove: {rowIndicesToRemove.Count:N0}");
-                Console.WriteLine($"Original dataset size: {_dataTable.Rows.Count:N0}");
-                Console.WriteLine($"Percentage to remove: {(double)rowIndicesToRemove.Count / _dataTable.Rows.Count * 100:F2}%");
-
-                
-                var removedTargetValues = new Dictionary<string, int>();
-                int removedNulls = 0;
-
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    foreach (var rowIndex in rowIndicesToRemove.Take(100))
-                    {
-                        if (rowIndex >= 0 && rowIndex < _dataTable.Rows.Count)
-                        {
-                            var value = _dataTable.Rows[rowIndex][_targetColumn];
-                            if (value == null || value == DBNull.Value)
-                            {
-                                removedNulls++;
-                            }
-                            else
-                            {
-                                var stringValue = value.ToString() ?? string.Empty;
-                                removedTargetValues[stringValue] = removedTargetValues.ContainsKey(stringValue)
-                                    ? removedTargetValues[stringValue] + 1 : 1;
-                            }
-                        }
-                    }
-                }
-
-                Console.WriteLine($"Target values being removed (first 100 outliers):");
-                Console.WriteLine($"  NULL values: {removedNulls}");
-                foreach (var kvp in removedTargetValues)
-                {
-                    Console.WriteLine($"  '{kvp.Key}': {kvp.Value} samples");
-                }
-
-                
-                var warningMessage = $"SELECTIVE OUTLIER REMOVAL:\n\n" +
-                                   $"Selected columns: {string.Join(", ", selectedColumns)}\n\n" +
-                                   $"Dataset size: {_dataTable.Rows.Count:N0} rows\n" +
-                                   $"Outliers to remove: {rowIndicesToRemove.Count:N0} rows ({(double)rowIndicesToRemove.Count / _dataTable.Rows.Count * 100:F2}%)\n\n";
-
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    warningMessage += $"Target column: '{_targetColumn}'\n" +
-                                    $"Current class distribution:\n" +
-                                    string.Join("\n", targetValueCounts.Select(kvp => $"  {kvp.Key}: {kvp.Value:N0} samples")) +
-                                    (nullCount > 0 ? $"\n  NULL: {nullCount:N0} samples" : "") +
-                                    "\n\n";
-                }
-
-                warningMessage += $"Do you want to proceed with selective outlier removal?\n\n" +
-                                $"⚠️ Large percentage removal may cause class imbalance issues!";
-
-                if (!_dialogService.ShowConfirmationDialog(warningMessage, "Confirm Selective Outlier Removal"))
-                {
-                    IsAnalyzing = false;
-                    AnalysisMessage = string.Empty;
-                    return;
-                }
-
-                AnalysisMessage = "Removing outliers from selected columns...";
-
-                
-                var originalRowCount = _dataTable.Rows.Count;
-
-                foreach (var rowIndex in rowIndicesToRemove.OrderByDescending(i => i))
-                {
-                    if (rowIndex >= 0 && rowIndex < _dataTable.Rows.Count)
-                    {
-                        _dataTable.Rows.RemoveAt(rowIndex);
-                    }
-                }
-
-                var newRowCount = _dataTable.Rows.Count;
-                var removedCount = originalRowCount - newRowCount;
-
-                
-                var finalTargetValueCounts = new Dictionary<string, int>();
-                int finalNullCount = 0;
-
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    foreach (DataRow row in _dataTable.Rows)
-                    {
-                        var value = row[_targetColumn];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            finalNullCount++;
-                        }
-                        else
-                        {
-                            var stringValue = value.ToString() ?? string.Empty;
-                            finalTargetValueCounts[stringValue] = finalTargetValueCounts.ContainsKey(stringValue)
-                                ? finalTargetValueCounts[stringValue] + 1 : 1;
-                        }
-                    }
-                }
-
-                Console.WriteLine($"Final target column distribution (after removal):");
-                Console.WriteLine($"  NULL/DBNull values: {finalNullCount}");
-                foreach (var kvp in finalTargetValueCounts.OrderByDescending(x => x.Value))
-                {
-                    Console.WriteLine($"  '{kvp.Key}': {kvp.Value:N0} samples");
-                }
-
-                
-                OutlierResults.Clear();
-                foreach (var summary in SummaryResults.Where(s => selectedColumns.Contains(s.ColumnName)))
-                {
-                    summary.OutlierCount = 0;
-                    summary.OutlierPercentage = 0;
-                    summary.Status = "Cleaned";
-                    summary.IsSelectedForRemoval = false;
-                }
-                RemoveOutliersEnabled = true;
-
-                
-                string resultMessage = $"Selective outlier removal completed:\n\n" +
-                                      $"Selected columns: {string.Join(", ", selectedColumns)}\n" +
-                                      $"Original dataset: {originalRowCount:N0} rows\n" +
-                                      $"Cleaned dataset: {newRowCount:N0} rows\n" +
-                                      $"Removed: {removedCount:N0} rows\n\n";
-
-                if (!string.IsNullOrEmpty(_targetColumn))
-                {
-                    resultMessage += $"Final Label Distribution:\n";
-
-                    if (finalTargetValueCounts.Any())
-                    {
-                        resultMessage += string.Join("\n", finalTargetValueCounts.Select(kvp => $"  {kvp.Key}: {kvp.Value:N0} samples"));
-                    }
-                    else
-                    {
-                        resultMessage += "  ⚠️ NO CLASS SAMPLES REMAINING!";
-                    }
-
-                    if (finalNullCount > 0)
-                    {
-                        resultMessage += $"\n  NULL: {finalNullCount:N0} samples";
-                    }
-
-                    
-                    bool hasClass0 = finalTargetValueCounts.ContainsKey("0") || finalTargetValueCounts.ContainsKey("False");
-                    bool hasClass1 = finalTargetValueCounts.ContainsKey("1") || finalTargetValueCounts.ContainsKey("True");
-
-                    if (!hasClass0 || !hasClass1)
-                    {
-                        resultMessage += "\n\n⚠️ WARNING: Missing class data may cause training errors!";
-                    }
-
-                    resultMessage += "\n\n";
-                }
-
-                resultMessage += "The cleaned dataset will be used for training.";
-
-                _dialogService.ShowInfoDialog(resultMessage, "Selective Outliers Removed");
-            }
-            catch (Exception ex)
-            {
-                _dialogService.ShowErrorDialog($"Error removing outliers: {ex.Message}", "Error");
-                Console.WriteLine($"Outlier removal error: {ex}");
-            }
-            finally
-            {
-                IsAnalyzing = false;
-                AnalysisMessage = string.Empty;
-            }
-        }
-
         #endregion
 
         #region INotifyPropertyChanged
@@ -905,17 +1056,219 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         }
 
         #endregion
+
+        private async Task<long> EstimateDataSizeAsync()
+        {
+            try
+            {
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
+                var countSql = $"SELECT COUNT(*) FROM {_tableName} {whereCondition}";
+
+                using var command = new Microsoft.Data.SqlClient.SqlCommand(countSql, connection);
+                command.CommandTimeout = 30;
+                var result = await command.ExecuteScalarAsync();
+                return Convert.ToInt64(result);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error estimating data size: {ex.Message}");
+                return 0; // Return 0 if estimation fails, will still use view approach
+            }
+        }
+
+        // NOTE: Persistent table methods removed - we now use views for ALL dataset sizes
+        // This provides zero storage overhead and automatic cleanup for any data size
+
+        private async Task<string?> CreateWinsorizedViewAsync(HashSet<string> selectedColumns)
+        {
+            // Create a view for ALL dataset sizes - provides zero storage overhead and optimal scalability
+            var guidPart = Guid.NewGuid().ToString("N")[..8];
+            var viewName = $"vw_WinsorizedData_{DateTime.Now:yyyyMMdd_HHmmss}_{guidPart}";
+
+            try
+            {
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                // Calculate percentiles for all selected columns with progress tracking
+                var percentileCalculations = new Dictionary<string, (decimal lower, decimal upper)>();
+                var totalColumns = selectedColumns.Count;
+                var currentColumn = 0;
+
+                Console.WriteLine($"=== Calculating percentiles for {totalColumns} columns ===");
+                CurrentStepDescription = "Calculating percentiles for all columns";
+
+                foreach (var column in selectedColumns)
+                {
+                    currentColumn++;
+                    // Progress: 10% to 70% for percentile calculations
+                    var stepProgress = 10 + ((currentColumn - 1) * 60) / totalColumns;
+                    WinsorizationProgressPercentage = stepProgress;
+
+                    Console.WriteLine($"[{currentColumn}/{totalColumns}] ({stepProgress}%) Processing column: {column}");
+                    CurrentColumnBeingProcessed = column;
+                    CurrentStepDescription = $"Calculating percentiles for {column}";
+                    WinsorizationProgress = $"Processing column {column} ({currentColumn} of {totalColumns})";
+
+                    var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+                    var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
+
+                    // Count valid values first
+                    CurrentStepDescription = $"Counting valid values in {column}";
+                    var countSql = $"SELECT COUNT(*) FROM {_tableName} WHERE {fullCondition}";
+                    using (var countCommand = new Microsoft.Data.SqlClient.SqlCommand(countSql, connection))
+                    {
+                        countCommand.CommandTimeout = 60;
+                        var validCount = Convert.ToInt64(countCommand.ExecuteScalar());
+                        Console.WriteLine($"  → Found {validCount:N0} valid numeric values in column {column}");
+                    }
+
+                    CurrentStepDescription = $"Computing percentiles for {column}";
+                    var percentilesSql = $@"
+                        SELECT DISTINCT
+                            PERCENTILE_CONT({WinsorLowerPercentile / 100.0}) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as LowerBound,
+                            PERCENTILE_CONT({WinsorUpperPercentile / 100.0}) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as UpperBound
+                        FROM {_tableName}
+                        WHERE {fullCondition}";
+
+                    using var percentilesCommand = new Microsoft.Data.SqlClient.SqlCommand(percentilesSql, connection);
+                    percentilesCommand.CommandTimeout = 120;
+                    using var reader = await percentilesCommand.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var lowerBound = Convert.ToDecimal(reader["LowerBound"]);
+                        var upperBound = Convert.ToDecimal(reader["UpperBound"]);
+                        percentileCalculations[column] = (lowerBound, upperBound);
+
+                        Console.WriteLine($"  → Percentiles: {WinsorLowerPercentile}% = {lowerBound:F4}, {WinsorUpperPercentile}% = {upperBound:F4}");
+                        Console.WriteLine($"  ✓ Column {column} percentiles calculated successfully");
+                        CurrentStepDescription = $"✓ Completed {column} - Lower: {lowerBound:F4}, Upper: {upperBound:F4}";
+
+                        // Brief pause to show the progress
+                        await Task.Delay(100);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"  ⚠️ Warning: No data found for column {column}");
+                        CurrentStepDescription = $"⚠️ No data found for {column}";
+                    }
+                }
+
+                // Build the view SQL with CASE statements for winsorization
+                WinsorizationProgressPercentage = 75;
+                CurrentStepDescription = "Building winsorization view SQL";
+                CurrentColumnBeingProcessed = "";
+                WinsorizationProgress = "Generating view definition with winsorization logic";
+
+                var selectColumns = new List<string>();
+                foreach (var col in _columns ?? new string[0])
+                {
+                    if (selectedColumns.Contains(col) && percentileCalculations.ContainsKey(col))
+                    {
+                        var (lower, upper) = percentileCalculations[col];
+                        selectColumns.Add($@"
+                            CASE
+                                WHEN ISNUMERIC([{col}]) = 1 AND CAST([{col}] AS FLOAT) < {lower} THEN {lower}
+                                WHEN ISNUMERIC([{col}]) = 1 AND CAST([{col}] AS FLOAT) > {upper} THEN {upper}
+                                ELSE [{col}]
+                            END AS [{col}]");
+                    }
+                    else
+                    {
+                        selectColumns.Add($"[{col}]");
+                    }
+                }
+
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
+                var createViewSql = $@"
+                    CREATE VIEW {viewName} AS
+                    SELECT {string.Join(",\n                           ", selectColumns)}
+                    FROM {_tableName}
+                    {whereCondition}";
+
+                WinsorizationProgressPercentage = 85;
+                CurrentStepDescription = $"Creating database view: {viewName}";
+                WinsorizationProgress = "Creating database view with winsorization logic";
+
+                Console.WriteLine($"Creating view: {viewName}");
+                using var createCommand = new Microsoft.Data.SqlClient.SqlCommand(createViewSql, connection);
+                createCommand.CommandTimeout = 120;
+                await createCommand.ExecuteNonQueryAsync();
+
+                WinsorizationProgressPercentage = 95;
+                CurrentStepDescription = "Finalizing winsorization process";
+                WinsorizationProgress = "View created successfully - finalizing";
+
+                Console.WriteLine($"View {viewName} created successfully - no storage overhead!");
+
+                await Task.Delay(500); // Brief pause to show completion
+                WinsorizationProgressPercentage = 100;
+                CurrentStepDescription = "✓ Winsorization completed successfully";
+
+                return viewName;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating winsorized view: {ex.Message}");
+                return null;
+            }
+        }
+
+        // NOTE: In-memory processing methods removed - we now use views for ALL dataset sizes
+        // This eliminates memory pressure and provides consistent performance across any data volume
+
+        public void Dispose()
+        {
+            // Clean up database view if created
+            CleanupDatabaseObjects();
+        }
+
+        /// <summary>
+        /// Manually clean up the winsorized/cleaned view from the database.
+        /// Call this after training is complete or when you no longer need the cleaned data.
+        /// </summary>
+        public void CleanupView()
+        {
+            CleanupDatabaseObjects();
+
+            // Reset state
+            _cleanedTableName = null;
+            _isViewCreated = false;
+            RemoveOutliersEnabled = false;
+
+            Console.WriteLine("View cleanup completed and state reset");
+        }
+
+        private void CleanupDatabaseObjects()
+        {
+            if (string.IsNullOrEmpty(_cleanedTableName) || string.IsNullOrEmpty(_connectionString) || !_isViewCreated)
+                return;
+
+            try
+            {
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
+                connection.Open();
+
+                // Clean up view (always a view in simplified approach)
+                var dropViewSql = $"DROP VIEW IF EXISTS {_cleanedTableName}";
+                using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand(dropViewSql, connection);
+                dropCommand.ExecuteNonQuery();
+                Console.WriteLine($"✓ Cleaned up view: {_cleanedTableName}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Could not clean up view {_cleanedTableName}: {ex.Message}");
+                // Don't throw - cleanup failure shouldn't break the application
+            }
+        }
     }
 
     #region Supporting Classes
 
-    public enum OutlierDetectionMethod
-    {
-        ZScore,
-        IQR,
-        ModifiedZScore
-    }
-    
     public class OutlierDetectionResult
     {
         public int RowIndex { get; set; }
@@ -928,7 +1281,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
     public class OutlierSummaryResult : INotifyPropertyChanged
     {
-        private bool _isSelectedForRemoval = true;
+        private bool _isSelectedForRemoval;
 
         public string ColumnName { get; set; } = string.Empty;
         public int TotalValues { get; set; }
@@ -941,7 +1294,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public int ExtremeSeverityCount { get; set; }
         public double MaxScore { get; set; }
         public string Status { get; set; } = string.Empty;
-        
+
         public bool IsSelectedForRemoval
         {
             get => _isSelectedForRemoval;
@@ -960,18 +1313,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         }
     }
 
-    public class OutlierInfo
-    {
-        public int Index { get; set; }
-        public double Value { get; set; }
-        public double Score { get; set; }
-    }
-
-    public class ValueInfo
-    {
-        public int Index { get; set; }
-        public double Value { get; set; }
-    }
 
     #endregion
 }

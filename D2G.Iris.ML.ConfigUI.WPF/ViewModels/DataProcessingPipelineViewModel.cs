@@ -10,6 +10,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private readonly DataBalancingViewModel _dataBalancingViewModel;
         private readonly FeatureEngineeringViewModel _featureEngineeringViewModel;
         private string _intermediateResultsTableName = "";
+        private string _intermediateResultsDatabase = "";
+        private string _intermediateResultsSchema = "dbo";
 
         public DataProcessingPipelineViewModel()
         {
@@ -99,6 +101,42 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _intermediateResultsTableName, value);
         }
 
+        public string IntermediateResultsDatabase
+        {
+            get => _intermediateResultsDatabase;
+            set => SetProperty(ref _intermediateResultsDatabase, value);
+        }
+
+        public string IntermediateResultsSchema
+        {
+            get => _intermediateResultsSchema;
+            set => SetProperty(ref _intermediateResultsSchema, value);
+        }
+
+        /// <summary>
+        /// Gets the full table name with database and schema (e.g., MyDB.dbo.IntermediateTable)
+        /// </summary>
+        public string FullIntermediateTableName
+        {
+            get
+            {
+                var parts = new System.Collections.Generic.List<string>();
+
+                if (!string.IsNullOrWhiteSpace(_intermediateResultsDatabase))
+                    parts.Add($"[{_intermediateResultsDatabase}]");
+
+                if (!string.IsNullOrWhiteSpace(_intermediateResultsSchema))
+                    parts.Add($"[{_intermediateResultsSchema}]");
+                else
+                    parts.Add("[dbo]");
+
+                if (!string.IsNullOrWhiteSpace(_intermediateResultsTableName))
+                    parts.Add($"[{_intermediateResultsTableName}]");
+
+                return string.Join(".", parts);
+            }
+        }
+
         #endregion
 
         #region Private Methods
@@ -135,7 +173,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             _dataBalancingViewModel.SetConfiguration(config.DataBalancing);
             _featureEngineeringViewModel.SetConfiguration(config.FeatureEngineering);
-            IntermediateResultsTableName = config.Database?.OutputTableName ?? "";
+
+            // Parse OutputTableName if it contains database.schema.table format
+            var outputTableName = config.Database?.OutputTableName ?? "";
+            ParseFullTableName(outputTableName);
         }
 
         public void SaveToConfig(ModelConfig config)
@@ -144,15 +185,52 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             config.FeatureEngineering = _featureEngineeringViewModel.GetConfiguration();
             if (config.Database != null)
             {
-                config.Database.OutputTableName = IntermediateResultsTableName;
+                // Save as full table name with database and schema
+                config.Database.OutputTableName = FullIntermediateTableName;
             }
         }
-        
+
         public void ResetToDefaults()
         {
             _dataBalancingViewModel.SetConfiguration(null);
             _featureEngineeringViewModel.SetConfiguration(null);
             IntermediateResultsTableName = "";
+            IntermediateResultsDatabase = "";
+            IntermediateResultsSchema = "dbo";
+        }
+
+        private void ParseFullTableName(string fullTableName)
+        {
+            if (string.IsNullOrWhiteSpace(fullTableName))
+            {
+                IntermediateResultsTableName = "";
+                IntermediateResultsDatabase = "";
+                IntermediateResultsSchema = "dbo";
+                return;
+            }
+
+            // Remove brackets and parse: [Database].[Schema].[Table] or [Schema].[Table] or [Table]
+            var cleaned = fullTableName.Replace("[", "").Replace("]", "");
+            var parts = cleaned.Split('.');
+
+            if (parts.Length == 3)
+            {
+                IntermediateResultsDatabase = parts[0];
+                IntermediateResultsSchema = parts[1];
+                IntermediateResultsTableName = parts[2];
+            }
+            else if (parts.Length == 2)
+            {
+                IntermediateResultsDatabase = "";
+                IntermediateResultsSchema = parts[0];
+                IntermediateResultsTableName = parts[1];
+            }
+            else
+            {
+                IntermediateResultsDatabase = "";
+                IntermediateResultsSchema = "dbo";
+                IntermediateResultsTableName = parts[0];
+            }
         }
 
         #endregion

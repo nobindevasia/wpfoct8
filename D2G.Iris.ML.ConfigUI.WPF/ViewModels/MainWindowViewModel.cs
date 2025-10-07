@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using System.Data;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using D2G.Iris.ML.ConfigUI.WPF.Commands;
@@ -28,6 +27,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private readonly IDataLoader _dataLoader;
         private readonly IDataProcessor _dataProcessor;
         private readonly IModelTrainerFactory _modelTrainerFactory;
+        private readonly IDatabaseAnalyticsService _databaseAnalytics;
         private ModelConfig? _currentConfig;
         private string? _currentFilePath;
         private string _windowTitle = "Iris ML Config";
@@ -41,7 +41,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             ISqlHandler sqlHandler,
             IDataLoader dataLoader,
             IDataProcessor dataProcessor,
-            IModelTrainerFactory modelTrainerFactory)
+            IModelTrainerFactory modelTrainerFactory,
+            IDatabaseAnalyticsService databaseAnalytics)
         {
             _configService = configService;
             _dialogService = dialogService;
@@ -50,6 +51,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _dataLoader = dataLoader;
             _dataProcessor = dataProcessor;
             _modelTrainerFactory = modelTrainerFactory;
+            _databaseAnalytics = databaseAnalytics;
 
             InitializeViewModels();
             InitializeCommands();
@@ -101,12 +103,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             GeneralSettings = new GeneralSettingsViewModel();
             DatabaseSettings = new DatabaseSettingsViewModel(_dialogService);
             InputFields = new InputFieldsViewModel(_dialogService);
-            ExploratoryDataAnalysis = new ExploratoryDataAnalysisViewModel(_dialogService);
+            ExploratoryDataAnalysis = new ExploratoryDataAnalysisViewModel(_dialogService, _databaseAnalytics);
             TrainingParameters = new TrainingParametersViewModel(_dialogService);
             DataProcessingPipeline = new DataProcessingPipelineViewModel();
             TrainingLogs = new TrainingLogsViewModel();
 
-
+            // Set up dependencies
             InputFields.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => TrainingParameters.TargetField);
             ExploratoryDataAnalysis.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => InputFields.GetConfiguration(), () => TrainingParameters.TargetField);
         }
@@ -119,7 +121,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             ExitCommand = new RelayCommand(_ => System.Windows.Application.Current.Shutdown());
             LaunchTrainingCommand = new AsyncRelayCommand(LaunchTraining, () => !IsTraining);
         }
-
 
         private void LoadExistingConfigOnStartup()
         {
@@ -309,12 +310,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return;
                 }
 
-                SelectedTabIndex = 6;
+                SelectedTabIndex = 6; // Switch to training logs tab
 
                 TrainingLogs.ClearLogs();
                 IsTraining = true;
 
                 await RunTrainingProcess();
+
+                // Clean up any database views created during data preparation
+                TrainingLogs.LogMessage("Cleaning up temporary database views...", "Info");
+                ExploratoryDataAnalysis.CleanupAfterTraining();
+                TrainingLogs.LogMessage("Cleanup completed successfully", "Success");
 
                 _dialogService.ShowInfoDialog("Training process completed! Check the Training Logs tab for details.", "Training Complete");
             }
@@ -332,15 +338,30 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             finally
             {
                 IsTraining = false;
+
+                // Ensure cleanup happens even if training fails
+                try
+                {
+                    ExploratoryDataAnalysis.CleanupAfterTraining();
+                }
+                catch (Exception cleanupEx)
+                {
+                    Console.WriteLine($"Warning: Cleanup after training failed: {cleanupEx.Message}");
+                    // Don't throw - cleanup failure shouldn't prevent the finally block from completing
+                }
             }
         }
 
         private async Task RunTrainingProcess()
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 try
                 {
+                    TrainingLogs.LogMessage("=============== Starting Training Process ===============", "Info");
+                    TrainingLogs.LogMessage("Using Database-Side Analytics for optimized data loading", "Info");
+
+                    // Create temporary config file
                     string tempConfigPath = Path.Combine(Path.GetTempPath(), "modelconfig.json");
                     var serializableConfig = new Dictionary<string, ModelConfig>
                     {
@@ -359,6 +380,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     var config = _configManager.LoadConfiguration(tempConfigPath);
 
+                    // Connect to database
                     _sqlHandler.Connect(config.Database);
 
                     var enabledFields = config.InputFields
@@ -369,67 +391,66 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     var mlContext = new Microsoft.ML.MLContext(seed: 42);
                     Microsoft.ML.IDataView rawData;
 
+                    TrainingLogs.LogMessage("=============== Loading Data ===============", "Info");
 
+                    // Check if we have cleaned data from EDA analysis
                     if (ExploratoryDataAnalysis.HasDataBeenLoaded())
                     {
-                        Console.WriteLine("=============== Loading Data ===============");
-                        Console.WriteLine("Using cached dataset from EDA analysis.");
+                        TrainingLogs.LogMessage("EDA analysis detected - checking for cleaned data...", "Info");
 
-
-                        var cachedDataTable = ExploratoryDataAnalysis.GetDataForTraining();
-                        if (cachedDataTable != null)
+                        if (ExploratoryDataAnalysis.HasDataBeenCleaned())
                         {
-                            if (ExploratoryDataAnalysis.HasDataBeenCleaned())
-                            {
-                                Console.WriteLine($">> Using cleaned data with {cachedDataTable.Rows.Count:N0} rows (outliers removed).");
-                            }
-                            else
-                            {
-                                Console.WriteLine($">> Using original EDA data with {cachedDataTable.Rows.Count:N0} rows.");
-                            }
+                            TrainingLogs.LogMessage("Using cleaned data from outlier detection analysis", "Info");
 
-
-                            rawData = ConvertDataTableToIDataView(
+                            // Use cleaned data if available
+                            rawData = await ExploratoryDataAnalysis.GetCleanedDataAsIDataViewAsync(
                                 mlContext,
-                                cachedDataTable,
                                 enabledFields,
                                 config.TargetField,
                                 config.ModelType);
+
+                            if (rawData == null)
+                            {
+                                TrainingLogs.LogMessage("Warning: Could not load cleaned data, falling back to original data", "Warning");
+                                rawData = LoadDataFromDatabase(config, enabledFields, mlContext);
+                            }
+                            else
+                            {
+                                TrainingLogs.LogMessage("Successfully loaded cleaned data for training", "Success");
+                            }
                         }
                         else
                         {
-                            Console.WriteLine("Warning: Cached data table is null, falling back to database loading.");
-
-                            rawData = _dataLoader.LoadDataFromSql(
-                                _sqlHandler.GetConnectionString(),
-                                config.Database.TableName,
-                                enabledFields,
-                                config.ModelType,
-                                config.TargetField,
-                                config.Database.WhereClause);
+                            TrainingLogs.LogMessage("No data cleaning applied - using original database data", "Info");
+                            rawData = LoadDataFromDatabase(config, enabledFields, mlContext);
                         }
                     }
                     else
                     {
-                        Console.WriteLine("=============== Loading Data ===============");
-                        Console.WriteLine("No cached data available, loading from database.");
-
-
-                        rawData = _dataLoader.LoadDataFromSql(
-                            _sqlHandler.GetConnectionString(),
-                            config.Database.TableName,
-                            enabledFields,
-                            config.ModelType,
-                            config.TargetField,
-                            config.Database.WhereClause);
+                        TrainingLogs.LogMessage("No EDA analysis performed - loading data directly from database", "Info");
+                        rawData = LoadDataFromDatabase(config, enabledFields, mlContext);
                     }
 
+                    // Log data shape information
+                    // Note: GetRowCount() often returns null for database views, but data loading works correctly
+                    var dataRowCount = rawData.GetRowCount();
+                    var rowCountText = dataRowCount.HasValue ? $"{dataRowCount:N0}" : "streaming (count from database loader)";
+                    TrainingLogs.LogMessage($"Final training dataset: {rowCountText} rows, {enabledFields.Length} features", "Info");
+                    TrainingLogs.LogMessage($"Target field: {config.TargetField}", "Info");
+                    TrainingLogs.LogMessage($"Model type: {config.ModelType}", "Info");
+
+                    // Process data
+                    TrainingLogs.LogMessage("=============== Processing Data ===============", "Info");
                     var processedData = _dataProcessor.ProcessData(
                         mlContext,
                         rawData,
                         enabledFields,
                         config).GetAwaiter().GetResult();
 
+                    TrainingLogs.LogMessage($"Data processing completed. Feature count: {processedData.FeatureNames?.Length ?? 0}", "Success");
+
+                    // Train model
+                    TrainingLogs.LogMessage("=============== Training Model ===============", "Info");
                     var modelTrainer = _modelTrainerFactory.CreateTrainer(config.ModelType);
 
                     modelTrainer.TrainModel(
@@ -439,6 +460,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         config,
                         processedData).GetAwaiter().GetResult();
 
+                    TrainingLogs.LogMessage("=============== Training Complete ===============", "Success");
+
+                    // Cleanup
                     try { File.Delete(tempConfigPath); } catch { }
                 }
                 catch (Exception ex)
@@ -449,239 +473,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             });
         }
 
-        
-        private Microsoft.ML.IDataView ConvertDataTableToIDataView(
-            Microsoft.ML.MLContext mlContext, 
-            DataTable dataTable, 
-            string[] featureColumns, 
-            string targetField, 
-            Core.Enums.ModelType modelType)
+        private Microsoft.ML.IDataView LoadDataFromDatabase(ModelConfig config, string[] enabledFields, Microsoft.ML.MLContext mlContext)
         {
-            try
-            {
-                
-                if (!dataTable.Columns.Contains(targetField))
-                {
-                    throw new InvalidOperationException($"Target column '{targetField}' not found in cleaned data. Available columns: {string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
-                }
+            TrainingLogs.LogMessage("Loading data from database using optimized data loader...", "Info");
 
-                
-                var missingFeatures = featureColumns.Where(col => !dataTable.Columns.Contains(col)).ToList();
-                if (missingFeatures.Any())
-                {
-                    Console.WriteLine($"Warning: Missing feature columns: {string.Join(", ", missingFeatures)}");
-                    featureColumns = featureColumns.Where(col => dataTable.Columns.Contains(col)).ToArray();
-                }
+            var rawData = _dataLoader.LoadDataFromSql(
+                _sqlHandler.GetConnectionString(),
+                config.Database.TableName,
+                enabledFields,
+                config.ModelType,
+                config.TargetField,
+                config.Database.WhereClause);
 
-                Console.WriteLine($"Converting DataTable with {dataTable.Rows.Count:N0} rows, {featureColumns.Length} features, target: {targetField}");
+            var rowCount = rawData.GetRowCount() ?? 0;
+            TrainingLogs.LogMessage($"Loaded {rowCount:N0} rows from database table '{config.Database.TableName}'", "Success");
 
-                switch (modelType)
-                {
-                    case Core.Enums.ModelType.BinaryClassification:
-                        return ConvertToBinaryClassificationDataView(mlContext, dataTable, featureColumns, targetField);
-                    
-                    case Core.Enums.ModelType.MultiClassClassification:
-                        return ConvertToMultiClassDataView(mlContext, dataTable, featureColumns, targetField);
-                    
-                    case Core.Enums.ModelType.Regression:
-                        return ConvertToRegressionDataView(mlContext, dataTable, featureColumns, targetField);
-                    
-                    default:
-                        throw new ArgumentException($"Unsupported model type: {modelType}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error converting DataTable to IDataView: {ex.Message}");
-                throw;
-            }
-        }
-
-        private Microsoft.ML.IDataView ConvertToBinaryClassificationDataView(Microsoft.ML.MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetField)
-        {
-            var dataPoints = new List<BinaryClassificationTrainingData>();
-            int validRows = 0;
-            int invalidRows = 0;
-            var labelCounts = new Dictionary<string, int>();
-            
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    var features = new float[featureColumns.Length];
-                    bool validRow = true;
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            features[i] = 0f;
-                        }
-                        else if (float.TryParse(value.ToString(), out float floatValue))
-                        {
-                            features[i] = floatValue;
-                        }
-                        else
-                        {
-                            features[i] = 0f;
-                        }
-                    }
-
-                    
-                    var labelValue = row[targetField];
-                    bool label = false;
-                    string labelString = "0";
-                    
-                    if (labelValue != null && labelValue != DBNull.Value)
-                    {
-                        labelString = labelValue.ToString()?.ToLower() ?? "0";
-                        label = labelString == "1" || labelString == "true" || labelString == "yes";
-                    }
-
-                    
-                    var labelKey = label ? "1" : "0";
-                    labelCounts[labelKey] = labelCounts.ContainsKey(labelKey) ? labelCounts[labelKey] + 1 : 1;
-
-                    if (validRow)
-                    {
-                        dataPoints.Add(new BinaryClassificationTrainingData
-                        {
-                            Features = features,
-                            Label = label
-                        });
-                        validRows++;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    invalidRows++;
-                    if (invalidRows <= 5) 
-                    {
-                        Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    }
-                    continue;
-                }
-            }
-
-            Console.WriteLine($"Conversion complete: {validRows} valid rows, {invalidRows} invalid rows");
-            Console.WriteLine("Label distribution:");
-            foreach (var kvp in labelCounts)
-            {
-                Console.WriteLine($"  {kvp.Key}: {kvp.Value:N0} samples");
-            }
-
-            if (!dataPoints.Any())
-            {
-                throw new InvalidOperationException("No valid data points created from DataTable");
-            }
-
-            var schemaDefinition = SchemaDefinition.Create(typeof(BinaryClassificationTrainingData));
-            schemaDefinition[nameof(BinaryClassificationTrainingData.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-        }
-
-        private Microsoft.ML.IDataView ConvertToMultiClassDataView(Microsoft.ML.MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetField)
-        {
-            var dataPoints = new List<MultiClassTrainingData>();
-            
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    var features = new float[featureColumns.Length];
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        features[i] = value == null || value == DBNull.Value ? 0f : Convert.ToSingle(value);
-                    }
-
-                    var labelValue = row[targetField];
-                    uint label = 0;
-                    if (labelValue != null && labelValue != DBNull.Value && uint.TryParse(labelValue.ToString(), out uint parsedLabel))
-                    {
-                        label = parsedLabel;
-                    }
-
-                    dataPoints.Add(new MultiClassTrainingData
-                    {
-                        Features = features,
-                        Label = label
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    continue;
-                }
-            }
-
-            if (!dataPoints.Any())
-            {
-                throw new InvalidOperationException("No valid data points created from DataTable");
-            }
-
-            var schemaDefinition = SchemaDefinition.Create(typeof(MultiClassTrainingData));
-            schemaDefinition[nameof(MultiClassTrainingData.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            Console.WriteLine($"Created multi-class data view with {dataPoints.Count} rows and {featureColumns.Length} features");
-            
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-        }
-
-        private Microsoft.ML.IDataView ConvertToRegressionDataView(Microsoft.ML.MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetField)
-        {
-            var dataPoints = new List<RegressionTrainingData>();
-            
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    var features = new float[featureColumns.Length];
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        features[i] = value == null || value == DBNull.Value ? 0f : Convert.ToSingle(value);
-                    }
-
-                    var labelValue = row[targetField];
-                    float label = 0f;
-                    if (labelValue != null && labelValue != DBNull.Value && float.TryParse(labelValue.ToString(), out float parsedLabel))
-                    {
-                        label = parsedLabel;
-                    }
-
-                    dataPoints.Add(new RegressionTrainingData
-                    {
-                        Features = features,
-                        Label = label
-                    });
-                }
-                catch (Exception ex)
-                
-                {
-                    Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    continue;
-                }
-            }
-
-            if (!dataPoints.Any())
-            {
-                throw new InvalidOperationException("No valid data points created from DataTable");
-            }
-
-            var schemaDefinition = SchemaDefinition.Create(typeof(RegressionTrainingData));
-            schemaDefinition[nameof(RegressionTrainingData.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            Console.WriteLine($"Created regression data view with {dataPoints.Count} rows and {featureColumns.Length} features");
-            
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
+            return rawData;
         }
 
         private void UpdateFormTitle()
@@ -722,30 +529,5 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             DataProcessingPipeline.SaveToConfig(_currentConfig);
         }
-    }
-
-    
-    public class BinaryClassificationTrainingData
-    {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public bool Label { get; set; }
-    }
-
-    public class MultiClassTrainingData
-    {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public uint Label { get; set; }
-    }
-
-    public class RegressionTrainingData
-    {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public float Label { get; set; }
     }
 }

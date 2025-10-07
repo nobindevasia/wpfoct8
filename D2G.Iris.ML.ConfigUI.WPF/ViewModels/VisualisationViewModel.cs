@@ -2,44 +2,51 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
-using SciChart.Charting.Model.ChartSeries;
 using SciChart.Charting.Model.DataSeries;
-using SciChart.Data.Model;
-
 using D2G.Iris.ML.ConfigUI.WPF.Services;
 using D2G.Iris.ML.ConfigUI.WPF.Commands;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
-    public class VisualisationViewModel : INotifyPropertyChanged
+    public class VisualisationViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly IDialogService _dialogService;
+        private readonly IDatabaseAnalyticsService _databaseAnalytics;
         private ObservableCollection<HistogramViewModel> _histograms;
         private HistogramViewModel? _selectedHistogram;
         private bool _isDetailViewVisible;
         private bool _isGeneratingHistograms;
         private string _progressMessage = string.Empty;
         private CancellationTokenSource? _cancellationTokenSource;
-        private DataTable? _dataTable;
         private string _dataInfo = string.Empty;
-        private readonly int _chunkSize = 1000;
 
-        public VisualisationViewModel(IDialogService dialogService)
+        // Database connection info
+        private string? _connectionString;
+        private string? _tableName;
+        private string[]? _columns;
+        private string? _whereClause;
+
+        public VisualisationViewModel(IDialogService dialogService, IDatabaseAnalyticsService databaseAnalytics)
         {
             _dialogService = dialogService;
+            _databaseAnalytics = databaseAnalytics;
             _histograms = new ObservableCollection<HistogramViewModel>();
-            
+
             SelectHistogramCommand = new AsyncRelayCommand(async obj => await SelectHistogramAsync(obj as HistogramViewModel));
             BackToOverviewCommand = new RelayCommand(_ => BackToOverview());
             CancelGenerationCommand = new RelayCommand(_ => CancelGeneration());
-            GenerateHistogramsCommand = new AsyncRelayCommand(async _ => await GenerateHistogramsAsync(), _ => CanGenerateHistograms());
+            GenerateHistogramsCommand = new AsyncRelayCommand(async _ => {
+                Console.WriteLine("=== GenerateHistogramsCommand executed ===");
+                await GenerateHistogramsAsync();
+            }, _ => CanGenerateHistograms());
         }
+
+        #region Properties
 
         public ObservableCollection<HistogramViewModel> Histograms
         {
@@ -82,9 +89,32 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _progressMessage, value);
         }
 
-        public async Task GenerateHistogramPreviewsAsync(DataTable dataTable)
+        #endregion
+
+        #region Public Methods
+
+        public void SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? whereClause = null)
         {
-            _dataTable = dataTable;
+            _connectionString = connectionString;
+            _tableName = tableName;
+            _columns = columns;
+            _whereClause = whereClause;
+            UpdateDataInfo();
+        }
+
+        public async Task GenerateHistogramPreviewsAsync()
+        {
+            Console.WriteLine("=== Starting GenerateHistogramPreviewsAsync ===");
+
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || _columns == null)
+            {
+                Console.WriteLine("✗ Database connection not configured");
+                _dialogService.ShowErrorDialog("Database connection not configured.", "Configuration Error");
+                return;
+            }
+
+            Console.WriteLine($"✓ Configuration: Table={_tableName}, Columns={_columns?.Length}");
+
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
             var cancellationToken = _cancellationTokenSource.Token;
@@ -94,40 +124,119 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             try
             {
-                ProgressMessage = "Analyzing columns...";
-                var columns = dataTable.Columns.Cast<DataColumn>()
-                    .Where(c => IsNumericColumn(c) || c.DataType == typeof(string))
-                    .ToList();
+                ProgressMessage = "Getting table schema...";
+                Console.WriteLine("Retrieving table schema...");
+                var schema = await _databaseAnalytics.GetTableSchemaAsync(_connectionString, _tableName);
+                Console.WriteLine($"✓ Schema retrieved: {schema.Count} columns found");
 
-                int processedColumns = 0;
-                int totalColumns = columns.Count;
+                var availableColumns = _columns.Where(col => schema.Any(s => s.ColumnName.Equals(col, StringComparison.OrdinalIgnoreCase))).ToArray();
+                Console.WriteLine($"✓ Available columns: {string.Join(", ", availableColumns)}");
 
-                foreach (DataColumn column in columns)
+                if (!availableColumns.Any())
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    ProgressMessage = $"Creating preview for {column.ColumnName} ({processedColumns + 1}/{totalColumns})...";
-
-                    var preview = CreateHistogramPreview(column, dataTable);
-                    if (preview != null)
-                    {
-                        Histograms.Add(preview);
-                    }
-
-                    processedColumns++;
-                    await Task.Delay(5, cancellationToken); 
+                    _dialogService.ShowErrorDialog("No valid columns found for visualization.", "Data Error");
+                    return;
                 }
 
-                ProgressMessage = "Previews ready";
-                await Task.Delay(50, cancellationToken);
+                ProgressMessage = "Analyzing column types...";
+                await Task.Delay(100, cancellationToken);
+
+                var numericColumns = new List<string>();
+                var categoricalColumns = new List<string>();
+
+                foreach (var column in availableColumns)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var columnSchema = schema.FirstOrDefault(s => s.ColumnName.Equals(column, StringComparison.OrdinalIgnoreCase));
+                    if (columnSchema != null)
+                    {
+                        if (IsNumericType(columnSchema.DataType))
+                        {
+                            numericColumns.Add(column);
+                            Console.WriteLine($"Added numeric column: {column} (Type: {columnSchema.DataType})");
+                        }
+                        else if (IsTextType(columnSchema.DataType))
+                        {
+                            categoricalColumns.Add(column);
+                        }
+                    }
+                }
+
+                var totalColumns = numericColumns.Count + categoricalColumns.Count;
+                var processedColumns = 0;
+
+                // Process numeric columns first
+                Console.WriteLine($"Starting to process {numericColumns.Count} numeric columns");
+                foreach (var column in numericColumns)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    processedColumns++;
+                    ProgressMessage = $"Generating histogram for {column} ({processedColumns}/{totalColumns})...";
+                    Console.WriteLine($"Processing column: {column}");
+
+                    try
+                    {
+                        var histogram = await CreateNumericHistogramAsync(column, cancellationToken);
+                        if (histogram != null)
+                        {
+                            Histograms.Add(histogram);
+                            Console.WriteLine($"✓ Successfully created histogram for {column}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"✗ Failed to create histogram for {column} (returned null)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"✗ Exception while processing {column}: {ex.GetType().Name} - {ex.Message}");
+                        if (ex.InnerException != null)
+                        {
+                            Console.WriteLine($"  Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
+                        }
+                    }
+
+                    await Task.Delay(50, cancellationToken);
+                }
+
+                // Process categorical columns
+                foreach (var column in categoricalColumns)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    processedColumns++;
+                    ProgressMessage = $"Generating frequency chart for {column} ({processedColumns}/{totalColumns})...";
+
+                    var histogram = await CreateCategoricalHistogramAsync(column, cancellationToken);
+                    if (histogram != null)
+                    {
+                        Histograms.Add(histogram);
+                    }
+
+                    await Task.Delay(50, cancellationToken);
+                }
+
+                ProgressMessage = "Histograms generated successfully";
+                await Task.Delay(500, cancellationToken);
+
+                _dialogService.ShowInfoDialog(
+                    $"Generated {Histograms.Count} visualizations using database-side analytics.\n\n" +
+                    $"Numeric columns: {numericColumns.Count}\n" +
+                    $"Categorical columns: {categoricalColumns.Count}",
+                    "Visualization Complete");
             }
             catch (OperationCanceledException)
             {
-                
+                // Operation was cancelled by user
+                ProgressMessage = "Generation cancelled";
+                await Task.Delay(1000);
             }
             catch (Exception ex)
             {
-                _dialogService.ShowErrorDialog($"Error generating previews: {ex.Message}", "Error");
+                _dialogService.ShowErrorDialog($"Error generating histograms: {ex.Message}", "Generation Error");
+                Console.WriteLine($"Histogram generation error: {ex}");
             }
             finally
             {
@@ -138,261 +247,362 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        public async Task GenerateHistogramsAsync(DataTable dataTable)
-        {
-            SetDataTable(dataTable);
-            await GenerateHistogramPreviewsAsync(dataTable);
-        }
-
         public async Task GenerateHistogramsAsync()
         {
-            if (_dataTable != null)
+            Console.WriteLine("=== GenerateHistogramsAsync called ===");
+            try
             {
-                
-                await GenerateHistogramPreviewsAsync(_dataTable);
+                await GenerateHistogramPreviewsAsync();
+                Console.WriteLine("=== GenerateHistogramPreviewsAsync completed ===");
             }
-            else
+            catch (Exception ex)
             {
-                _dialogService.ShowErrorDialog("No data available for visualization. Please run data analysis first.", "No Data");
+                Console.WriteLine($"=== Exception in GenerateHistogramsAsync: {ex.GetType().Name} - {ex.Message} ===");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"=== Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message} ===");
+                }
+                throw;
             }
         }
 
-        
-        public void GenerateHistograms(DataTable dataTable)
-        {
-            SetDataTable(dataTable);
-            _ = GenerateHistogramPreviewsAsync(dataTable);
-        }
+        #endregion
 
-        public void SetDataTable(DataTable dataTable)
-        {
-            _dataTable = dataTable;
-            UpdateDataInfo();
-        }
+        #region Private Methods
 
+        private async Task TestBasicDatabaseOperations()
+        {
+            if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName))
+            {
+                _dialogService.ShowErrorDialog("Database not configured", "Test Error");
+                return;
+            }
+
+            try
+            {
+                // Test 1: Simple connection
+                _dialogService.ShowInfoDialog("Testing database connection...", "Test");
+
+                var connectionTest = await _databaseAnalytics.TestConnectionAsync(_connectionString);
+                if (!connectionTest)
+                {
+                    _dialogService.ShowErrorDialog("Connection test failed", "Test Error");
+                    return;
+                }
+
+                // Test 2: Table schema
+                _dialogService.ShowInfoDialog("Testing schema retrieval...", "Test");
+
+                var schema = await _databaseAnalytics.GetTableSchemaAsync(_connectionString, _tableName);
+                _dialogService.ShowInfoDialog($"Schema test passed. Found {schema.Count} columns", "Test Success");
+
+                // Test 3: Debug histogram steps on first numeric column
+                if (schema.Any())
+                {
+                    var firstNumericColumn = schema.FirstOrDefault(s => IsNumericType(s.DataType))?.ColumnName;
+                    if (firstNumericColumn != null)
+                    {
+                        _dialogService.ShowInfoDialog($"Testing histogram steps on column: {firstNumericColumn}", "Histogram Test");
+
+                        var histogramDebugInfo = await _databaseAnalytics.DebugHistogramStepsAsync(_connectionString, _tableName, firstNumericColumn);
+                        _dialogService.ShowInfoDialog($"Histogram debug results:\n{histogramDebugInfo}", "Histogram Debug Results");
+                    }
+                    else
+                    {
+                        _dialogService.ShowInfoDialog("No numeric columns found for histogram testing", "Test Info");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog($"Test failed: {ex.GetType().Name}\n{ex.Message}", "Test Error");
+                throw;
+            }
+        }
 
         private bool CanGenerateHistograms()
         {
-            return _dataTable != null && !IsGeneratingHistograms;
+            return !string.IsNullOrEmpty(_connectionString) &&
+                   !string.IsNullOrEmpty(_tableName) &&
+                   _columns?.Length > 0 &&
+                   !IsGeneratingHistograms;
         }
 
         private void UpdateDataInfo()
         {
-            if (_dataTable != null)
+            if (!string.IsNullOrEmpty(_connectionString) && _columns?.Length > 0)
             {
-                var numericColumns = _dataTable.Columns.Cast<DataColumn>()
-                    .Count(col => IsNumericColumn(col));
-                DataInfo = $"Data ready: {_dataTable.Rows.Count} rows, {numericColumns} numeric columns";
+                DataInfo = $"Database ready: {_columns.Length} columns available for visualization";
             }
             else
             {
-                DataInfo = "No data available - run data analysis first";
+                DataInfo = "No database connection - run data analysis first";
             }
         }
 
-        private HistogramViewModel CreateHistogramPreview(DataColumn column, DataTable dataTable)
+        private async Task<HistogramViewModel?> CreateNumericHistogramAsync(string columnName, CancellationToken cancellationToken)
         {
-            var totalRows = dataTable.Rows.Count;
-            var columnType = IsNumericColumn(column) ? "Numeric" : "Categorical";
-            
-            
-            if (IsNumericColumn(column))
+            try
             {
-                return CreateSimpleNumericPreview(column, dataTable);
-            }
-            else if (column.DataType == typeof(string))
-            {
-                return CreateSimpleCategoricalPreview(column, dataTable);
-            }
-            
-            
-            var sampleSize = Math.Min(100, totalRows);
-            var dataSeries = new XyDataSeries<double, int>();
-            dataSeries.Append(0, 0); 
-            
-            return new HistogramViewModel
-            {
-                ColumnName = column.ColumnName,
-                ColumnType = columnType,
-                TotalCount = totalRows,
-                IsPreviewOnly = true,
-                DataSeries = dataSeries,
-                PreviewInfo = new PreviewInfo
-                {
-                    SampleSize = sampleSize,
-                    NonNullCount = 0,
-                    UniqueValueCount = 0,
-                    MissingCount = sampleSize
-                }
-            };
-        }
+                const int bins = 20;
+                var histogramData = await _databaseAnalytics.GetHistogramDataAsync(
+                    _connectionString!, _tableName!, columnName, bins, _whereClause);
 
-        private HistogramViewModel CreateSimpleNumericPreview(DataColumn column, DataTable dataTable)
-        {
-            var values = new List<double>();
-            var totalRows = dataTable.Rows.Count;
-
-            
-            for (int i = 0; i < totalRows; i++)
-            {
-                var value = dataTable.Rows[i][column];
-                if (value != null && value != DBNull.Value && double.TryParse(value.ToString(), out double numericValue))
+                if (!histogramData.Any())
                 {
-                    values.Add(numericValue);
+                    Console.WriteLine($"No histogram data returned for column: {columnName}");
+
+                    // Debug basic operations
+                    var debugInfo = await _databaseAnalytics.DebugBasicOperationsAsync(
+                        _connectionString!, _tableName!, columnName);
+                    Console.WriteLine($"Debug info for {columnName}:");
+                    Console.WriteLine(debugInfo);
+
+                    return null;
                 }
-            }
-            
-            if (!values.Any())
-            {
-                var emptyDataSeries = new XyDataSeries<double, int>();
-                emptyDataSeries.Append(0, 0);
+
+                // Create data series for SciChart
+                var dataSeries = new XyDataSeries<double, long>();
+                var histogramBins = new List<HistogramBin>();
+
+                foreach (var bin in histogramData.OrderBy(h => h.BinIndex))
+                {
+                    dataSeries.Append(bin.BinCenter, bin.Count);
+                    histogramBins.Add(new HistogramBin
+                    {
+                        BinStart = bin.BinStart,
+                        BinEnd = bin.BinEnd,
+                        BinCenter = bin.BinCenter,
+                        Count = (int)bin.Count,
+                        BinIndex = bin.BinIndex
+                    });
+                }
+
+                // Get column statistics for the summary
+                var columnStats = await GetColumnStatisticsAsync(columnName);
+                var statistics = CreateNumericStatisticalSummary(columnStats, histogramData.Sum(h => h.Count));
+
                 return new HistogramViewModel
                 {
-                    ColumnName = column.ColumnName,
+                    ColumnName = columnName,
                     ColumnType = "Numeric",
-                    TotalCount = dataTable.Rows.Count,
-                    IsPreviewOnly = true,
-                    DataSeries = emptyDataSeries
+                    Bins = histogramBins,
+                    TotalCount = (int)histogramData.Sum(h => h.Count),
+                    DataSeries = dataSeries,
+                    Statistics = statistics,
+                    IsPreviewOnly = false
                 };
             }
-            
-            
-            var bins = 10;
-            var min = values.Min();
-            var max = values.Max();
-            var range = max - min;
-            
-            var dataSeries = new XyDataSeries<double, int>();
-            
-            if (range == 0)
+            catch (Exception ex)
             {
-                dataSeries.Append(min, values.Count);
-            }
-            else
-            {
-                var binWidth = range / bins;
-                for (int i = 0; i < bins; i++)
+                Console.WriteLine($"Error creating numeric histogram for {columnName}: {ex.GetType().Name} - {ex.Message}");
+                if (ex.InnerException != null)
                 {
-                    var binStart = min + i * binWidth;
-                    var binEnd = binStart + binWidth;
-                    var count = values.Count(v => v >= binStart && (i == bins - 1 ? v <= binEnd : v < binEnd));
-                    var binCenter = binStart + binWidth / 2;
-                    dataSeries.Append(binCenter, count);
+                    Console.WriteLine($"Inner exception: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
                 }
+                return null;
             }
-            
-            return new HistogramViewModel
+        }
+
+        private async Task<HistogramViewModel?> CreateCategoricalHistogramAsync(string columnName, CancellationToken cancellationToken)
+        {
+            try
             {
-                ColumnName = column.ColumnName,
-                ColumnType = "Numeric",
-                TotalCount = dataTable.Rows.Count,
-                IsPreviewOnly = false,
-                DataSeries = dataSeries,
-                PreviewInfo = new PreviewInfo
+                const int maxCategories = 20;
+                var categoryData = await _databaseAnalytics.GetCategoricalDataAsync(
+                    _connectionString!, _tableName!, columnName, maxCategories, _whereClause);
+
+                if (!categoryData.Any())
+                    return null;
+
+                // Create data series for SciChart
+                var dataSeries = new XyDataSeries<double, long>();
+                var histogramBins = new List<HistogramBin>();
+
+                for (int i = 0; i < categoryData.Count; i++)
                 {
-                    SampleSize = totalRows,
-                    NonNullCount = values.Count,
-                    UniqueValueCount = values.Distinct().Count(),
-                    MissingCount = totalRows - values.Count
+                    var category = categoryData[i];
+                    dataSeries.Append(i + 0.5, category.Count);
+                    histogramBins.Add(new HistogramBin
+                    {
+                        BinStart = i,
+                        BinEnd = i + 1,
+                        BinCenter = i + 0.5,
+                        Count = (int)category.Count,
+                        CategoryName = category.Category,
+                        BinIndex = i
+                    });
                 }
+
+                // Create statistics for categorical data
+                var statistics = CreateCategoricalStatisticalSummary(categoryData);
+
+                return new HistogramViewModel
+                {
+                    ColumnName = columnName,
+                    ColumnType = "Categorical",
+                    Bins = histogramBins,
+                    TotalCount = (int)categoryData.Sum(c => c.Count),
+                    DataSeries = dataSeries,
+                    Statistics = statistics,
+                    IsPreviewOnly = false
+                };
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error creating categorical histogram for {columnName}: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<ColumnStatistics?> GetColumnStatisticsAsync(string columnName)
+        {
+            try
+            {
+                var stats = await _databaseAnalytics.GetColumnStatisticsAsync(
+                    _connectionString!, _tableName!, new[] { columnName }, _whereClause);
+                return stats.FirstOrDefault();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private StatisticalSummary CreateNumericStatisticalSummary(ColumnStatistics? columnStats, long totalCount)
+        {
+            if (columnStats == null)
+            {
+                return new StatisticalSummary();
+            }
+
+            return new StatisticalSummary
+            {
+                Mean = columnStats.Mean ?? 0,
+                Median = 0, // Would need additional query to calculate
+                StandardDeviation = columnStats.StandardDeviation ?? 0,
+                Variance = columnStats.Variance ?? 0,
+                Min = columnStats.Min ?? 0,
+                Max = columnStats.Max ?? 0,
+                Range = (columnStats.Max ?? 0) - (columnStats.Min ?? 0),
+                Q1 = 0, // Would need additional query
+                Q3 = 0, // Would need additional query
+                IQR = 0, // Would need additional query
+                Skewness = 0, // Would need additional query
+                Kurtosis = 0, // Would need additional query
+                UniqueValues = (int)(columnStats.UniqueCount ?? 0),
+                MissingValues = 0, // Could get from missing value analysis
+                MostFrequentValue = "",
+                MostFrequentCount = 0
             };
         }
 
-        private HistogramViewModel CreateSimpleCategoricalPreview(DataColumn column, DataTable dataTable)
+        private StatisticalSummary CreateCategoricalStatisticalSummary(List<CategoryFrequency> categoryData)
         {
-            var allValues = new List<string>();
-            var totalRows = dataTable.Rows.Count;
+            var mostFrequent = categoryData.FirstOrDefault();
+            var totalCount = categoryData.Sum(c => c.Count);
 
-            
-            for (int i = 0; i < totalRows; i++)
+            return new StatisticalSummary
             {
-                var value = dataTable.Rows[i][column]?.ToString();
-                if (!string.IsNullOrWhiteSpace(value))
-                {
-                    allValues.Add(value);
-                }
-            }
-            
-            var categoryGroups = allValues
-                .GroupBy(s => s)
-                .OrderByDescending(g => g.Count())
-                .Take(20) 
-                .ToList();
-            
-            var dataSeries = new XyDataSeries<double, int>();
-            
-            if (!categoryGroups.Any())
-            {
-                dataSeries.Append(0, 0);
-            }
-            else
-            {
-                for (int i = 0; i < categoryGroups.Count; i++)
-                {
-                    dataSeries.Append(i + 0.5, categoryGroups[i].Count());
-                }
-            }
-            
-            return new HistogramViewModel
-            {
-                ColumnName = column.ColumnName,
-                ColumnType = "Categorical",
-                TotalCount = dataTable.Rows.Count,
-                IsPreviewOnly = false,
-                DataSeries = dataSeries,
-                PreviewInfo = new PreviewInfo
-                {
-                    SampleSize = totalRows,
-                    NonNullCount = allValues.Count,
-                    UniqueValueCount = allValues.Distinct().Count(),
-                    MissingCount = totalRows - allValues.Count
-                }
+                UniqueValues = categoryData.Count,
+                MissingValues = 0, // Could get from missing value analysis
+                MostFrequentValue = mostFrequent?.Category ?? "",
+                MostFrequentCount = (int)(mostFrequent?.Count ?? 0),
+                // Other numeric stats don't apply to categorical data
+                Mean = 0,
+                Median = 0,
+                StandardDeviation = 0,
+                Variance = 0,
+                Min = 0,
+                Max = 0,
+                Range = 0,
+                Q1 = 0,
+                Q3 = 0,
+                IQR = 0,
+                Skewness = 0,
+                Kurtosis = 0
             };
         }
 
-        public async Task LoadFullHistogramAsync(HistogramViewModel histogram)
+        private bool IsNumericType(string dataType)
         {
-            if (_dataTable == null || histogram.IsLoading) return;
-            
+            return dataType.ToLower() switch
+            {
+                "int" or "bigint" or "smallint" or "tinyint" or
+                "decimal" or "numeric" or "money" or "smallmoney" or
+                "float" or "real" => true,
+                _ => false
+            };
+        }
+
+        private bool IsTextType(string dataType)
+        {
+            return dataType.ToLower() switch
+            {
+                "char" or "varchar" or "text" or "nchar" or "nvarchar" or "ntext" => true,
+                _ => false
+            };
+        }
+
+        private async Task SelectHistogramAsync(HistogramViewModel? histogram)
+        {
+            if (histogram == null) return;
+
+            try
+            {
+                foreach (var h in Histograms)
+                {
+                    h.IsSelected = false;
+                }
+
+                histogram.IsSelected = true;
+                SelectedHistogram = histogram;
+                IsDetailViewVisible = true;
+
+                // If this is a preview-only histogram, load full data
+                if (histogram.IsPreviewOnly)
+                {
+                    await LoadFullHistogramAsync(histogram);
+                }
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog($"Error selecting histogram: {ex.Message}", "Error");
+            }
+        }
+
+        private async Task LoadFullHistogramAsync(HistogramViewModel histogram)
+        {
+            if (histogram.IsLoading) return;
+
             try
             {
                 histogram.IsLoading = true;
-                
-                
-                if (!_dataTable.Columns.Contains(histogram.ColumnName))
-                {
-                    _dialogService.ShowErrorDialog($"Column '{histogram.ColumnName}' no longer exists in the dataset.", "Error");
-                    return;
-                }
-                
-                var column = _dataTable.Columns[histogram.ColumnName];
-                if (column == null)
-                {
-                    _dialogService.ShowErrorDialog($"Failed to access column '{histogram.ColumnName}'.", "Error");
-                    return;
-                }
-                
-                
+
+                // Reload with more detailed data if needed
                 HistogramViewModel? detailedHistogram = null;
-                
-                if (IsNumericColumn(column))
+
+                if (histogram.ColumnType == "Numeric")
                 {
-                    detailedHistogram = await CreateNumericHistogramAsync(column, _dataTable, CancellationToken.None);
+                    detailedHistogram = await CreateNumericHistogramAsync(histogram.ColumnName, CancellationToken.None);
                 }
-                else if (column.DataType == typeof(string))
+                else if (histogram.ColumnType == "Categorical")
                 {
-                    detailedHistogram = await CreateCategoricalHistogramAsync(column, _dataTable, CancellationToken.None);
+                    detailedHistogram = await CreateCategoricalHistogramAsync(histogram.ColumnName, CancellationToken.None);
                 }
-                
+
                 if (detailedHistogram != null)
                 {
-                    
                     detailedHistogram.IsSelected = histogram.IsSelected;
-                    
+
                     var index = Histograms.IndexOf(histogram);
                     if (index >= 0 && index < Histograms.Count)
                     {
                         Histograms[index] = detailedHistogram;
+                        if (SelectedHistogram == histogram)
+                        {
+                            SelectedHistogram = detailedHistogram;
+                        }
                     }
                 }
             }
@@ -403,354 +613,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             finally
             {
                 histogram.IsLoading = false;
-            }
-        }
-
-
-        private bool IsNumericColumn(DataColumn column)
-        {
-            return column.DataType == typeof(int) || 
-                   column.DataType == typeof(long) || 
-                   column.DataType == typeof(short) || 
-                   column.DataType == typeof(byte) ||
-                   column.DataType == typeof(float) || 
-                   column.DataType == typeof(double) || 
-                   column.DataType == typeof(decimal);
-        }
-
-        private async Task<HistogramViewModel?> CreateNumericHistogramAsync(DataColumn column, DataTable dataTable, CancellationToken cancellationToken)
-        {
-            if (column == null || dataTable == null) return null;
-            return await Task.Run(() => CreateNumericHistogram(column, dataTable), cancellationToken);
-        }
-
-        private HistogramViewModel? CreateNumericHistogram(DataColumn column, DataTable dataTable)
-        {
-            if (column == null || dataTable == null) return null;
-            
-            var values = new List<double>();
-            var allValues = new List<object?>();
-            
-            
-            int rowCount = dataTable.Rows.Count;
-
-            for (int i = 0; i < rowCount; i++)
-            {
-                var value = dataTable.Rows[i][column];
-                allValues.Add(value);
-
-                if (value != null && value != DBNull.Value)
-                {
-                    if (double.TryParse(value.ToString(), out double numericValue))
-                    {
-                        values.Add(numericValue);
-                    }
-                }
-
-                
-                if (i % _chunkSize == 0)
-                {
-                    Thread.Yield();
-                }
-            }
-
-            if (!values.Any()) return null;
-
-            var bins = 20;
-            var min = values.Min();
-            var max = values.Max();
-            var range = max - min;
-            
-            var histogram = new List<HistogramBin>();
-
-            
-            if (range == 0 || Math.Abs(range) < double.Epsilon)
-            {
-                
-                
-                var totalCount = values.Count;
-                var spread = Math.Max(1.0, Math.Abs(min) * 0.1); 
-                if (spread == 0) spread = 1.0; 
-                
-                histogram.Add(new HistogramBin
-                {
-                    BinStart = min - spread,
-                    BinEnd = min - spread/3,
-                    Count = 0,
-                    BinCenter = min - spread * 2/3
-                });
-                
-                histogram.Add(new HistogramBin
-                {
-                    BinStart = min - spread/3,
-                    BinEnd = min + spread/3,
-                    Count = totalCount,
-                    BinCenter = min,
-                    CategoryName = min.ToString("F2")
-                });
-                
-                histogram.Add(new HistogramBin
-                {
-                    BinStart = min + spread/3,
-                    BinEnd = min + spread,
-                    Count = 0,
-                    BinCenter = min + spread * 2/3
-                });
-            }
-            else
-            {
-                var binWidth = range / bins;
-                
-                for (int i = 0; i < bins; i++)
-                {
-                    var binStart = min + i * binWidth;
-                    var binEnd = binStart + binWidth;
-                    var count = values.Count(v => v >= binStart && (i == bins - 1 ? v <= binEnd : v < binEnd));
-                    
-                    histogram.Add(new HistogramBin
-                    {
-                        BinStart = binStart,
-                        BinEnd = binEnd,
-                        Count = count,
-                        BinCenter = binStart + binWidth / 2
-                    });
-                }
-            }
-
-            var dataSeries = new XyDataSeries<double, int>();
-            foreach (var bin in histogram)
-            {
-                dataSeries.Append(bin.BinCenter, bin.Count);
-            }
-
-            var statistics = CalculateNumericStatistics(values, allValues);
-
-            var result = new HistogramViewModel
-            {
-                ColumnName = column.ColumnName,
-                ColumnType = "Numeric",
-                Bins = histogram,
-                TotalCount = values.Count,
-                DataSeries = dataSeries,
-                Statistics = statistics
-            };
-            
-            return result;
-        }
-
-        private async Task<HistogramViewModel?> CreateCategoricalHistogramAsync(DataColumn column, DataTable dataTable, CancellationToken cancellationToken)
-        {
-            if (column == null || dataTable == null) return null;
-            return await Task.Run(() => CreateCategoricalHistogram(column, dataTable), cancellationToken);
-        }
-
-        private HistogramViewModel? CreateCategoricalHistogram(DataColumn column, DataTable dataTable)
-        {
-            if (column == null || dataTable == null) return null;
-            
-            var allValues = new List<string?>();
-            
-            
-            int rowCount = dataTable.Rows.Count;
-
-            for (int i = 0; i < rowCount; i++)
-            {
-                allValues.Add(dataTable.Rows[i][column]?.ToString());
-
-                
-                if (i % _chunkSize == 0)
-                {
-                    Thread.Yield();
-                }
-            }
-
-            var categoryGroups = allValues
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .GroupBy(s => s!)
-                .OrderByDescending(g => g.Count())
-                .Take(20)
-                .ToList();
-
-            if (!categoryGroups.Any()) return null;
-
-            var histogram = categoryGroups.Select((group, index) => new HistogramBin
-            {
-                BinStart = index,
-                BinEnd = index + 1,
-                Count = group.Count(),
-                BinCenter = index + 0.5,
-                CategoryName = group.Key
-            }).ToList();
-
-            var dataSeries = new XyDataSeries<double, int>();
-            foreach (var bin in histogram)
-            {
-                dataSeries.Append(bin.BinCenter, bin.Count);
-            }
-
-            var statistics = CalculateCategoricalStatistics(allValues);
-
-            return new HistogramViewModel
-            {
-                ColumnName = column.ColumnName,
-                ColumnType = "Categorical",
-                Bins = histogram,
-                TotalCount = categoryGroups.Sum(g => g.Count()),
-                DataSeries = dataSeries,
-                Statistics = statistics
-            };
-        }
-
-        private StatisticalSummary CalculateNumericStatistics(List<double> values, List<object?> allValues)
-        {
-            if (!values.Any()) return new StatisticalSummary();
-
-            var sortedValues = values.OrderBy(x => x).ToList();
-            var n = values.Count;
-            
-            var mean = values.Average();
-            var variance = n > 1 ? values.Sum(x => Math.Pow(x - mean, 2)) / n : 0;
-            var standardDeviation = Math.Sqrt(Math.Max(0, variance)); 
-            
-            var median = n % 2 == 0 
-                ? (sortedValues[n / 2 - 1] + sortedValues[n / 2]) / 2.0
-                : sortedValues[n / 2];
-            
-            var q1 = CalculatePercentile(sortedValues, 25);
-            var q3 = CalculatePercentile(sortedValues, 75);
-            var iqr = Math.Max(0, q3 - q1); 
-            
-            var skewness = CalculateSkewness(values, mean, standardDeviation);
-            var kurtosis = CalculateKurtosis(values, mean, standardDeviation);
-            
-            var missingCount = allValues.Count(v => v == null || v == DBNull.Value || 
-                (v is string str && string.IsNullOrWhiteSpace(str)));
-
-            var frequencies = values.GroupBy(x => x).OrderByDescending(g => g.Count()).FirstOrDefault();
-            var range = sortedValues.Count > 1 ? sortedValues.Last() - sortedValues.First() : 0;
-
-            return new StatisticalSummary
-            {
-                Mean = Double.IsNaN(mean) ? 0 : mean,
-                Median = Double.IsNaN(median) ? 0 : median,
-                StandardDeviation = Double.IsNaN(standardDeviation) ? 0 : standardDeviation,
-                Variance = Double.IsNaN(variance) ? 0 : variance,
-                Min = sortedValues.First(),
-                Max = sortedValues.Last(),
-                Range = range,
-                Q1 = Double.IsNaN(q1) ? sortedValues.First() : q1,
-                Q3 = Double.IsNaN(q3) ? sortedValues.Last() : q3,
-                IQR = Double.IsNaN(iqr) ? 0 : iqr,
-                Skewness = Double.IsNaN(skewness) ? 0 : skewness,
-                Kurtosis = Double.IsNaN(kurtosis) ? 0 : kurtosis,
-                UniqueValues = values.Distinct().Count(),
-                MissingValues = missingCount,
-                MostFrequentValue = frequencies?.Key.ToString() ?? "",
-                MostFrequentCount = frequencies?.Count() ?? 0
-            };
-        }
-
-        private StatisticalSummary CalculateCategoricalStatistics(List<string?> allValues)
-        {
-            var nonNullValues = allValues.Where(v => !string.IsNullOrWhiteSpace(v)).ToList();
-            var missingCount = allValues.Count - nonNullValues.Count;
-            
-            var frequencies = nonNullValues.GroupBy(x => x).OrderByDescending(g => g.Count()).ToList();
-            var mostFrequent = frequencies.FirstOrDefault();
-
-            return new StatisticalSummary
-            {
-                UniqueValues = nonNullValues.Distinct().Count(),
-                MissingValues = missingCount,
-                MostFrequentValue = mostFrequent?.Key ?? "",
-                MostFrequentCount = mostFrequent?.Count() ?? 0
-            };
-        }
-
-        private double CalculatePercentile(List<double> sortedValues, double percentile)
-        {
-            if (sortedValues == null || !sortedValues.Any())
-                return 0;
-                
-            var n = sortedValues.Count;
-            
-            if (n == 1)
-                return sortedValues[0];
-                
-            var index = percentile / 100.0 * (n - 1);
-            
-            if (index <= 0)
-                return sortedValues[0];
-            if (index >= n - 1)
-                return sortedValues[n - 1];
-            
-            if (index == Math.Floor(index))
-            {
-                return sortedValues[(int)index];
-            }
-            else
-            {
-                var lower = (int)Math.Floor(index);
-                var upper = (int)Math.Ceiling(index);
-                var weight = index - lower;
-                
-                
-                lower = Math.Max(0, Math.Min(lower, n - 1));
-                upper = Math.Max(0, Math.Min(upper, n - 1));
-                
-                return sortedValues[lower] * (1 - weight) + sortedValues[upper] * weight;
-            }
-        }
-
-        private double CalculateSkewness(List<double> values, double mean, double standardDeviation)
-        {
-            if (standardDeviation == 0) return 0;
-            
-            var n = values.Count;
-            var sum = values.Sum(x => Math.Pow((x - mean) / standardDeviation, 3));
-            
-            return sum / n;
-        }
-
-        private double CalculateKurtosis(List<double> values, double mean, double standardDeviation)
-        {
-            if (standardDeviation == 0) return 0;
-            
-            var n = values.Count;
-            var sum = values.Sum(x => Math.Pow((x - mean) / standardDeviation, 4));
-            
-            return (sum / n) - 3; 
-        }
-
-        private async Task SelectHistogramAsync(HistogramViewModel? histogram)
-        {
-            if (histogram == null) return;
-            
-            try
-            {
-                foreach (var h in Histograms)
-                {
-                    h.IsSelected = false;
-                }
-                
-                histogram.IsSelected = true;
-                
-                
-                await LoadFullHistogramAsync(histogram);
-                
-                histogram = Histograms.FirstOrDefault(h => h.ColumnName == histogram.ColumnName);
-                if (histogram == null)
-                {
-                    _dialogService.ShowErrorDialog("Failed to load histogram data.", "Error");
-                    return;
-                }
-                
-                SelectedHistogram = histogram;
-                IsDetailViewVisible = true;
-            }
-            catch (Exception ex)
-            {
-                _dialogService.ShowErrorDialog($"Error selecting histogram: {ex.Message}", "Error");
             }
         }
 
@@ -769,9 +631,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _cancellationTokenSource?.Cancel();
         }
 
+        #endregion
+
+        #region IDisposable
+
+        public void Dispose()
+        {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+        }
+
+        #endregion
+
+        #region INotifyPropertyChanged
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -784,7 +659,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             OnPropertyChanged(propertyName);
             return true;
         }
+
+        #endregion
     }
+
+    #region Supporting Classes
 
     public class HistogramViewModel : INotifyPropertyChanged
     {
@@ -813,7 +692,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         }
 
         public event PropertyChangedEventHandler? PropertyChanged;
-        
+
         protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -855,6 +734,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double BinCenter { get; set; }
         public int Count { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+        public int BinIndex { get; set; }
     }
 
     public class PreviewInfo
@@ -866,4 +746,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double MissingPercentage => SampleSize > 0 ? (double)MissingCount / SampleSize * 100 : 0;
         public double DataQuality => SampleSize > 0 ? (double)NonNullCount / SampleSize * 100 : 0;
     }
+
+    #endregion
 }

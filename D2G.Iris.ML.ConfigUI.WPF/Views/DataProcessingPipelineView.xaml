@@ -195,20 +195,69 @@
                 </GroupBox>
             </Grid>
             
-            
-            <Grid Grid.Row="2" Margin="8,8,8,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="170"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                
-                <Label Grid.Column="0" Content="Intermediate Results Table:" 
-                       FontSize="12" FontWeight="Bold" Padding="0,2" VerticalAlignment="Center"/>
-                <TextBox Grid.Column="2" 
-                         Text="{Binding IntermediateResultsTableName, UpdateSourceTrigger=PropertyChanged}" 
-                         Style="{StaticResource CompactInputStyle}" 
-                         ToolTip="Name of the table to store intermediate processing results"/>
+
+            <!-- Intermediate Results Configuration -->
+            <Grid Grid.Row="2" Margin="8,8,8,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="8"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Label Grid.Row="0" Content="Intermediate Results Output Configuration"
+                       FontSize="13" FontWeight="Bold" Padding="0,2"/>
+
+                <!-- Database -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0" Content="Database (optional):"
+                           FontSize="12" Padding="0,2" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="2"
+                             Text="{Binding IntermediateResultsDatabase, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource CompactInputStyle}"
+                             ToolTip="Database name (leave empty to use current database)"/>
+                </Grid>
+
+                <!-- Schema -->
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0" Content="Schema:"
+                           FontSize="12" Padding="0,2" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="2"
+                             Text="{Binding IntermediateResultsSchema, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource CompactInputStyle}"
+                             ToolTip="Schema name (default: dbo)"/>
+                </Grid>
+
+                <!-- Table Name -->
+                <Grid Grid.Row="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Label Grid.Column="0" Content="Table Name:"
+                           FontSize="12" FontWeight="Bold" Padding="0,2" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="2"
+                             Text="{Binding IntermediateResultsTableName, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource CompactInputStyle}"
+                             ToolTip="Name of the table to store intermediate processing results"/>
+                </Grid>
             </Grid>
         </Grid>
     </GroupBox>

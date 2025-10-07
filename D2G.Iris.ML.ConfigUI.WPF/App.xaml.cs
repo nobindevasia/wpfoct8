@@ -19,32 +19,47 @@ namespace D2G.Iris.ML.ConfigUI.WPF
         {
             var services = new ServiceCollection();
 
+            // Core Configuration Services
             services.AddSingleton<IConfigurationService, ConfigurationService>();
             services.AddSingleton<IDatabaseSchemaLoader, DatabaseSchemaLoader>();
             services.AddSingleton<IDialogService, DialogService>();
-
-            // Register ML dependencies
             services.AddSingleton<IConfigManager, ConfigManager>();
+
+            // Data Services
             services.AddSingleton<ISqlHandler>(provider => new SqlHandler("DefaultTable"));
             services.AddSingleton<IDataLoader, DatabaseDataLoader>();
             services.AddSingleton<IDataProcessor, DataProcessor>();
+
+            // ML Services
             services.AddSingleton<MLContext>();
             services.AddSingleton<IModelTrainerFactory, ModelTrainerFactory>();
 
+            // NEW: Database Analytics Service for EDA
+            services.AddSingleton<IDatabaseAnalyticsService, DatabaseAnalyticsService>();
 
+            // Main ViewModels
             services.AddTransient<MainWindowViewModel>();
             services.AddTransient<GeneralSettingsViewModel>();
             services.AddTransient<DatabaseSettingsViewModel>();
             services.AddTransient<InputFieldsViewModel>();
             services.AddTransient<TrainingParametersViewModel>();
+
+            // Data Processing ViewModels
             services.AddTransient<DataBalancingViewModel>();
             services.AddTransient<FeatureEngineeringViewModel>();
             services.AddTransient<AutoMLSettingsViewModel>();
+
+            // EDA ViewModels (now using dependency injection)
+            services.AddTransient<ExploratoryDataAnalysisViewModel>();
+            services.AddTransient<VisualisationViewModel>();
+            services.AddTransient<OutlierDetectionViewModel>();
+
+            // Training & Logging
             services.AddTransient<TrainingLogsViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 
-
+            // Create main window with dependency injection
             var mainWindowViewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
             var mainWindow = new MainWindow(mainWindowViewModel);
 

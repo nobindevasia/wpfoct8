@@ -11,7 +11,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using SciChart.Charting.Model.DataSeries;
-using SciChart.Charting.Model.DataSeries.Heatmap2DArrayDataSeries;
 using SciChart.Charting.Visuals;
 using SciChart.Charting.Visuals.RenderableSeries;
 using SciChart.Charting.Visuals.Axes;
@@ -21,7 +20,6 @@ using SciChart.Drawing.Common;
 using SciChart.Charting.ChartModifiers;
 using SciChart.Data.Model;
 using SciChart.Core.Extensions;
-using Microsoft.Data.SqlClient;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using D2G.Iris.ML.ConfigUI.WPF.Commands;
@@ -29,12 +27,14 @@ using D2G.Iris.ML.ConfigUI.WPF.Services;
 using D2G.Iris.ML.Core.Models;
 using D2G.Iris.ML.Core.Enums;
 using D2G.Iris.ML.Data;
+using SciChart.Charting.Model.DataSeries.Heatmap2DArrayDataSeries;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
     public class ExploratoryDataAnalysisViewModel : BaseViewModel, IDisposable
     {
         private readonly IDialogService _dialogService;
+        private readonly IDatabaseAnalyticsService _databaseAnalytics;
         private int _numberOfRows;
         private int _numberOfColumns;
         private int _totalMissingValues;
@@ -48,21 +48,27 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string _loadingMessage = "Loading data...";
         private VisualisationViewModel _visualisationViewModel;
         private OutlierDetectionViewModel _outlierDetectionViewModel;
-        private int _maxSampleSize = 10000;
-        private bool _useDataSampling = false;
         private UserControl? _correlationHeatmapChart;
-        private DataTable? _currentDataTable;
 
-        public ExploratoryDataAnalysisViewModel(IDialogService dialogService)
+        // Database-side analytics data
+        private DatasetSummary? _currentDatasetSummary;
+        private List<ColumnStatistics>? _currentColumnStatistics;
+        private string? _connectionString;
+        private string? _tableName;
+        private string[]? _enabledColumns;
+        private string? _whereClause;
+
+        public ExploratoryDataAnalysisViewModel(IDialogService dialogService, IDatabaseAnalyticsService? databaseAnalytics = null)
         {
             _dialogService = dialogService;
+            _databaseAnalytics = databaseAnalytics ?? new DatabaseAnalyticsService();
             _featureTypes = new ObservableCollection<FeatureTypeInfo>();
             _columnMissingValues = new ObservableCollection<ColumnMissingInfo>();
-            _visualisationViewModel = new VisualisationViewModel(dialogService);
-            _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService);
-            
-            AnalyzeDataCommand = new RelayCommand(_ => AnalyzeData(), _ => CanAnalyzeData());
-            GenerateCorrelationCommand = new RelayCommand(_ => GenerateCorrelationMatrix(), _ => CanGenerateCorrelation());
+            _visualisationViewModel = new VisualisationViewModel(dialogService, _databaseAnalytics);
+            _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService, _databaseAnalytics);
+
+            AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
+            GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
         }
 
         #region Properties
@@ -127,18 +133,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _outlierDetectionViewModel, value);
         }
 
-        public bool UseDataSampling
-        {
-            get => _useDataSampling;
-            set => SetProperty(ref _useDataSampling, value);
-        }
-
-        public int MaxSampleSize
-        {
-            get => _maxSampleSize;
-            set => SetProperty(ref _maxSampleSize, value);
-        }
-
         public UserControl? CorrelationHeatmapChart
         {
             get => _correlationHeatmapChart;
@@ -163,13 +157,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _getTargetField = getTargetField;
         }
 
-        public DataTable? GetCleanedDataForTraining()
+        public bool HasDataBeenLoaded()
         {
-            if (_outlierDetectionViewModel.HasOutliersBeenRemoved())
-            {
-                return _outlierDetectionViewModel.GetCleanedDataTable();
-            }
-            return null;
+            return _currentDatasetSummary != null;
         }
 
         public bool HasDataBeenCleaned()
@@ -177,281 +167,75 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return _outlierDetectionViewModel.HasOutliersBeenRemoved();
         }
 
-        public bool HasDataBeenLoaded()
+        /// <summary>
+        /// Clean up the winsorized/cleaned database view after training is complete.
+        /// This removes the temporary view from the database.
+        /// </summary>
+        public void CleanupAfterTraining()
         {
-            return _currentDataTable != null;
+            _outlierDetectionViewModel.CleanupView();
         }
 
-        public DataTable? GetOriginalDataForTraining()
+        // For training - return cleaned data info or original data info
+        public DatabaseDataInfo? GetDataForTraining()
         {
-            return _currentDataTable;
-        }
-
-        public DataTable? GetDataForTraining()
-        {
-            if (_outlierDetectionViewModel.HasOutliersBeenRemoved())
-            {
-                return _outlierDetectionViewModel.GetCleanedDataTable();
-            }
-            return _currentDataTable;
-        }
-
-        public IDataView? GetCleanedDataAsIDataView(MLContext mlContext, IEnumerable<string> featureColumns, string targetColumn, ModelType modelType)
-        {
-            if (!HasDataBeenCleaned() || _outlierDetectionViewModel.GetCleanedDataTable() == null)
+            if (_connectionString == null || _tableName == null || _enabledColumns == null)
                 return null;
 
-            var cleanedDataTable = _outlierDetectionViewModel.GetCleanedDataTable()!;
-            
-            
-            var featureColumnsList = featureColumns.ToList();
-            var missingColumns = featureColumnsList.Where(col => !cleanedDataTable.Columns.Contains(col)).ToList();
-            if (missingColumns.Any())
+            return new DatabaseDataInfo
             {
-                Console.WriteLine($"Warning: Missing feature columns: {string.Join(", ", missingColumns)}");
-                featureColumnsList = featureColumnsList.Where(col => cleanedDataTable.Columns.Contains(col)).ToList();
-            }
+                ConnectionString = _connectionString,
+                TableName = _tableName,
+                Columns = _enabledColumns,
+                WhereClause = _whereClause,
+                IsCleanedData = HasDataBeenCleaned(),
+                RowCount = _numberOfRows
+            };
+        }
 
-            if (!cleanedDataTable.Columns.Contains(targetColumn))
-            {
-                Console.WriteLine($"Error: Target column '{targetColumn}' not found in cleaned data");
+        public async Task<IDataView?> GetCleanedDataAsIDataViewAsync(MLContext mlContext, IEnumerable<string> featureColumns, string targetColumn, ModelType modelType)
+        {
+            if (!HasDataBeenCleaned() || _connectionString == null || _tableName == null)
                 return null;
-            }
 
-            
             try
             {
-                switch (modelType)
+                // First try to get cleaned data directly from memory (for small datasets)
+                if (_outlierDetectionViewModel.IsUsingInMemoryData())
                 {
-                    case ModelType.BinaryClassification:
-                        return CreateBinaryClassificationDataView(mlContext, cleanedDataTable, featureColumnsList.ToArray(), targetColumn);
-                    
-                    case ModelType.MultiClassClassification:
-                        return CreateMultiClassDataView(mlContext, cleanedDataTable, featureColumnsList.ToArray(), targetColumn);
-                    
-                    case ModelType.Regression:
-                        return CreateRegressionDataView(mlContext, cleanedDataTable, featureColumnsList.ToArray(), targetColumn);
-                    
-                    default:
-                        throw new ArgumentException($"Unsupported model type: {modelType}");
+                    var cleanedDataView = _outlierDetectionViewModel.GetCleanedDataView();
+                    if (cleanedDataView != null)
+                    {
+                        Console.WriteLine("Using cleaned data from memory");
+                        return cleanedDataView;
+                    }
                 }
+
+                // Use database approach for cleaned data
+                var cleanedDataInfo = _outlierDetectionViewModel.GetCleanedDataInfo();
+                if (cleanedDataInfo == null)
+                    return null;
+
+                Console.WriteLine("Falling back to database approach for cleaned data");
+
+                // Use the database data loader to create IDataView directly from database
+                var dataLoader = new DatabaseDataLoader();
+                var allColumns = featureColumns.Concat(new[] { targetColumn }).ToArray();
+
+                return dataLoader.LoadDataFromSql(
+                    _connectionString,
+                    cleanedDataInfo.TableName, // This might be a temp table with cleaned data
+                    allColumns,
+                    modelType,
+                    targetColumn,
+                    cleanedDataInfo.WhereClause
+                );
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error converting DataTable to IDataView: {ex.Message}");
+                Console.WriteLine($"Error creating cleaned IDataView: {ex.Message}");
                 return null;
             }
-        }
-
-        private IDataView CreateBinaryClassificationDataView(MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetColumn)
-        {
-            var dataPoints = new List<BinaryClassificationDataPoint>(dataTable.Rows.Count);
-
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    
-                    var features = new float[featureColumns.Length];
-                    bool validRow = true;
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            features[i] = 0f; 
-                        }
-                        else if (float.TryParse(value.ToString(), out float floatValue))
-                        {
-                            features[i] = floatValue;
-                        }
-                        else
-                        {
-                            features[i] = 0f; 
-                        }
-                    }
-
-                    
-                    var labelValue = row[targetColumn];
-                    bool label = false;
-                    
-                    if (labelValue != null && labelValue != DBNull.Value)
-                    {
-                        var labelStr = labelValue.ToString()?.ToLower() ?? string.Empty;
-                        label = labelStr == "1" || labelStr == "true" || labelStr == "yes";
-                    }
-
-                    if (validRow)
-                    {
-                        dataPoints.Add(new BinaryClassificationDataPoint
-                        {
-                            Features = features,
-                            Label = label
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    continue;
-                }
-            }
-
-            
-            var schemaDefinition = SchemaDefinition.Create(typeof(BinaryClassificationDataPoint));
-
-            if (!dataPoints.Any())
-            {
-                Console.WriteLine("Error: No valid data points created");
-                return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-            }
-            schemaDefinition[nameof(BinaryClassificationDataPoint.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            Console.WriteLine($"Created binary classification data view with {dataPoints.Count} rows and {featureColumns.Length} features");
-            
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-        }
-
-        private IDataView CreateMultiClassDataView(MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetColumn)
-        {
-            var dataPoints = new List<MultiClassDataPoint>(dataTable.Rows.Count);
-
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    var features = new float[featureColumns.Length];
-                    bool validRow = true;
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            features[i] = 0f;
-                        }
-                        else if (float.TryParse(value.ToString(), out float floatValue))
-                        {
-                            features[i] = floatValue;
-                        }
-                        else
-                        {
-                            features[i] = 0f;
-                        }
-                    }
-
-                    var labelValue = row[targetColumn];
-                    uint label = 0;
-                    
-                    if (labelValue != null && labelValue != DBNull.Value)
-                    {
-                        if (uint.TryParse(labelValue.ToString(), out uint parsedLabel))
-                        {
-                            label = parsedLabel;
-                        }
-                    }
-
-                    if (validRow)
-                    {
-                        dataPoints.Add(new MultiClassDataPoint
-                        {
-                            Features = features,
-                            Label = label
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    continue;
-                }
-            }
-
-            var schemaDefinition = SchemaDefinition.Create(typeof(MultiClassDataPoint));
-
-            if (!dataPoints.Any())
-            {
-                Console.WriteLine("Error: No valid data points created");
-                return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-            }
-            schemaDefinition[nameof(MultiClassDataPoint.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            Console.WriteLine($"Created multi-class data view with {dataPoints.Count} rows and {featureColumns.Length} features");
-            
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-        }
-
-        private IDataView CreateRegressionDataView(MLContext mlContext, DataTable dataTable, string[] featureColumns, string targetColumn)
-        {
-            var dataPoints = new List<RegressionDataPoint>(dataTable.Rows.Count);
-
-            foreach (DataRow row in dataTable.Rows)
-            {
-                try
-                {
-                    var features = new float[featureColumns.Length];
-                    bool validRow = true;
-                    
-                    for (int i = 0; i < featureColumns.Length; i++)
-                    {
-                        var value = row[featureColumns[i]];
-                        if (value == null || value == DBNull.Value)
-                        {
-                            features[i] = 0f;
-                        }
-                        else if (float.TryParse(value.ToString(), out float floatValue))
-                        {
-                            features[i] = floatValue;
-                        }
-                        else
-                        {
-                            features[i] = 0f;
-                        }
-                    }
-
-                    var labelValue = row[targetColumn];
-                    float label = 0f;
-                    
-                    if (labelValue != null && labelValue != DBNull.Value)
-                    {
-                        if (float.TryParse(labelValue.ToString(), out float parsedLabel))
-                        {
-                            label = parsedLabel;
-                        }
-                    }
-
-                    if (validRow)
-                    {
-                        dataPoints.Add(new RegressionDataPoint
-                        {
-                            Features = features,
-                            Label = label
-                        });
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Warning: Skipping invalid row: {ex.Message}");
-                    continue;
-                }
-            }
-
-            var schemaDefinition = SchemaDefinition.Create(typeof(RegressionDataPoint));
-
-            if (!dataPoints.Any())
-            {
-                Console.WriteLine("Error: No valid data points created");
-                return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
-            }
-            schemaDefinition[nameof(RegressionDataPoint.Features)].ColumnType = 
-                new VectorDataViewType(NumberDataViewType.Single, featureColumns.Length);
-
-            Console.WriteLine($"Created regression data view with {dataPoints.Count} rows and {featureColumns.Length} features");
-            
-            return mlContext.Data.LoadFromEnumerable(dataPoints, schemaDefinition);
         }
 
         #endregion
@@ -465,57 +249,278 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private bool CanGenerateCorrelation()
         {
-            return _currentDataTable != null && !_isLoading;
+            return _currentColumnStatistics != null &&
+                   _currentColumnStatistics.Any(c => IsNumericType(c.DataType)) &&
+                   !_isLoading;
         }
 
-        private async void GenerateCorrelationMatrix()
+        private async Task AnalyzeDataAsync()
+        {
+            Console.WriteLine("=== Starting EDA Analysis ===");
+            try
+            {
+                IsLoading = true;
+                LoadingMessage = "Validating configuration...";
+                Console.WriteLine("✓ Starting data analysis");
+
+                var databaseConfig = _getDatabaseConfig?.Invoke();
+                var inputFields = _getInputFields?.Invoke();
+
+                if (databaseConfig == null)
+                {
+                    _dialogService.ShowErrorDialog("Database configuration is not available.", "Error");
+                    return;
+                }
+
+                if (inputFields == null || !inputFields.Any())
+                {
+                    _dialogService.ShowErrorDialog("No input fields are configured.", "Error");
+                    return;
+                }
+
+                var enabledFields = inputFields.Where(f => f.IsEnabled).ToList();
+                if (!enabledFields.Any())
+                {
+                    _dialogService.ShowErrorDialog("No input fields are enabled for analysis.", "Error");
+                    return;
+                }
+
+                // Store connection info for later use
+                var sqlHandler = new SqlHandler(databaseConfig.TableName);
+                sqlHandler.Connect(databaseConfig);
+                _connectionString = sqlHandler.GetConnectionString();
+                _tableName = databaseConfig.TableName;
+                _whereClause = databaseConfig.WhereClause;
+
+                var targetField = _getTargetField?.Invoke();
+                var allFieldsForEDA = enabledFields.Select(f => f.Name).ToList();
+                if (!string.IsNullOrEmpty(targetField) && !allFieldsForEDA.Contains(targetField))
+                {
+                    allFieldsForEDA.Add(targetField);
+                }
+                _enabledColumns = allFieldsForEDA.ToArray();
+
+                LoadingMessage = "Testing database connection...";
+                await Task.Delay(100);
+
+                if (!await _databaseAnalytics.TestConnectionAsync(_connectionString))
+                {
+                    _dialogService.ShowErrorDialog("Cannot connect to database. Please check your database settings.", "Connection Failed");
+                    return;
+                }
+
+                LoadingMessage = "Loading dataset summary...";
+                await Task.Delay(100);
+
+                // Get dataset summary
+                Console.WriteLine("Getting dataset summary...");
+                try
+                {
+                    _currentDatasetSummary = await _databaseAnalytics.GetDatasetSummaryAsync(
+                        _connectionString, _tableName, _enabledColumns, _whereClause);
+                    Console.WriteLine("✓ Dataset summary retrieved successfully");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"✗ Dataset summary failed: {ex.GetType().Name} - {ex.Message}");
+                    throw;
+                }
+
+                NumberOfRows = (int)_currentDatasetSummary.TotalRows;
+                NumberOfColumns = _currentDatasetSummary.TotalColumns;
+
+                LoadingMessage = "Analyzing column statistics...";
+                await Task.Delay(100);
+
+                // Get detailed column statistics
+                Console.WriteLine("Getting column statistics...");
+                try
+                {
+                    _currentColumnStatistics = await _databaseAnalytics.GetColumnStatisticsAsync(
+                        _connectionString, _tableName, _enabledColumns, _whereClause);
+                    Console.WriteLine("✓ Column statistics retrieved successfully");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"✗ Column statistics failed: {ex.GetType().Name} - {ex.Message}");
+                    throw;
+                }
+
+                LoadingMessage = "Analyzing feature types...";
+                await Task.Delay(100);
+
+                // Update feature types
+                await UpdateFeatureTypesAsync();
+
+                LoadingMessage = "Analyzing missing values...";
+                await Task.Delay(100);
+
+                // Get missing values analysis
+                Console.WriteLine("Getting missing values analysis...");
+                try
+                {
+                    var missingValuesInfo = await _databaseAnalytics.GetMissingValuesAnalysisAsync(
+                        _connectionString, _tableName, _enabledColumns, _whereClause);
+                    Console.WriteLine("✓ Missing values analysis completed successfully");
+
+                    await UpdateMissingValuesAsync(missingValuesInfo);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"✗ Missing values analysis failed: {ex.GetType().Name} - {ex.Message}");
+                    throw;
+                }
+
+                LoadingMessage = "Setting up visualization components...";
+                await Task.Delay(100);
+
+                // Set up visualization with database analytics
+                _visualisationViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+
+                LoadingMessage = "Setting up outlier detection...";
+                await Task.Delay(100);
+
+                // Set up outlier detection with database analytics
+                _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
+
+                _dialogService.ShowInfoDialog(
+                    $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +
+                    $"Dataset: {NumberOfRows:N0} rows � {NumberOfColumns} columns\n" +
+                    $"Missing values: {TotalMissingValues:N0} ({MissingValuesPercentage:F2}%)",
+                    "Analysis Complete");
+            }
+            catch (Exception ex)
+            {
+                _dialogService.ShowErrorDialog($"Error analyzing data: {ex.Message}", "Analysis Error");
+                Console.WriteLine($"EDA Analysis error: {ex}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        private async Task GenerateCorrelationMatrixAsync()
         {
             try
             {
                 IsLoading = true;
                 LoadingMessage = "Calculating correlations...";
 
-                if (_currentDataTable == null)
+                if (_currentColumnStatistics == null || _connectionString == null || _tableName == null)
                 {
                     _dialogService.ShowErrorDialog("No data available. Please analyze data first.", "Error");
                     return;
                 }
 
-                
-                var correlationData = await Task.Run(() =>
-                {
-                    var numericColumns = GetNumericColumns(_currentDataTable);
-                    if (numericColumns.Count < 2)
-                    {
-                        return (numericColumns, (double[,])null);
-                    }
-                    var correlationMatrix = CalculateCorrelationMatrix(_currentDataTable, numericColumns);
-                    return (numericColumns, correlationMatrix);
-                });
+                var numericColumns = _currentColumnStatistics
+                    .Where(c => IsNumericType(c.DataType))
+                    .Select(c => c.ColumnName)
+                    .ToArray();
 
-                
-                UserControl correlationChart;
-                if (correlationData.Item2 == null)
+                if (numericColumns.Length < 2)
                 {
-                    correlationChart = CreateErrorControl("At least 2 numeric columns are required for correlation analysis.");
-                }
-                else
-                {
-                    correlationChart = CreateCorrelationHeatmap(correlationData.Item2, correlationData.numericColumns);
+                    var errorChart = CreateErrorControl("At least 2 numeric columns are required for correlation analysis.");
+                    CorrelationHeatmapChart = errorChart;
+                    _dialogService.ShowErrorDialog("At least 2 numeric columns are required for correlation analysis.", "Insufficient Data");
+                    return;
                 }
 
+                LoadingMessage = $"Computing correlations for {numericColumns.Length} numeric columns...";
+                await Task.Delay(100);
+
+                var correlationMatrix = await _databaseAnalytics.GetCorrelationMatrixAsync(
+                    _connectionString, _tableName, numericColumns, _whereClause);
+
+                LoadingMessage = "Creating correlation heatmap...";
+                await Task.Delay(100);
+
+                // Create UI controls on the UI thread (not in Task.Run)
+                var correlationChart = CreateCorrelationHeatmap(correlationMatrix);
                 CorrelationHeatmapChart = correlationChart;
 
-                _dialogService.ShowInfoDialog("Correlation matrix generated successfully.", "Correlation Analysis");
+                _dialogService.ShowInfoDialog("Correlation matrix generated successfully using database analytics.", "Correlation Analysis");
             }
             catch (Exception ex)
             {
                 _dialogService.ShowErrorDialog($"Error generating correlation matrix: {ex.Message}", "Correlation Error");
+                Console.WriteLine($"Correlation error: {ex}");
             }
             finally
             {
                 IsLoading = false;
             }
+        }
+
+        private async Task UpdateFeatureTypesAsync()
+        {
+            if (_currentColumnStatistics == null) return;
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var typeGroups = _currentColumnStatistics
+                    .GroupBy(c => GetFeatureTypeCategory(c.DataType))
+                    .Select(g => new FeatureTypeInfo
+                    {
+                        Type = g.Key,
+                        Count = g.Count()
+                    })
+                    .OrderBy(x => x.Type);
+
+                FeatureTypes.Clear();
+                foreach (var typeInfo in typeGroups)
+                {
+                    FeatureTypes.Add(typeInfo);
+                }
+            });
+        }
+
+        private async Task UpdateMissingValuesAsync(List<MissingValueInfo> missingValuesInfo)
+        {
+            var totalCells = NumberOfRows * NumberOfColumns;
+            var totalMissing = missingValuesInfo.Sum(m => m.MissingCount);
+
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                TotalMissingValues = (int)totalMissing;
+                MissingValuesPercentage = totalCells > 0 ? (double)totalMissing / totalCells * 100 : 0;
+
+                ColumnMissingValues.Clear();
+                foreach (var info in missingValuesInfo.OrderByDescending(x => x.MissingCount))
+                {
+                    ColumnMissingValues.Add(new ColumnMissingInfo
+                    {
+                        ColumnName = info.ColumnName,
+                        MissingCount = (int)info.MissingCount,
+                        MissingPercentage = info.MissingPercentage
+                    });
+                }
+            });
+        }
+
+        private string GetFeatureTypeCategory(string dataType)
+        {
+            return dataType.ToLower() switch
+            {
+                "int" or "bigint" or "smallint" or "tinyint" or
+                "decimal" or "numeric" or "money" or "smallmoney" or
+                "float" or "real" => "Numeric",
+                "char" or "varchar" or "text" or "nchar" or "nvarchar" or "ntext" => "Text/Categorical",
+                "date" or "time" or "datetime" or "datetime2" or "smalldatetime" or "datetimeoffset" => "Date/Time",
+                "bit" => "Boolean",
+                _ => "Other"
+            };
+        }
+
+        private bool IsNumericType(string dataType)
+        {
+            return dataType.ToLower() switch
+            {
+                "int" or "bigint" or "smallint" or "tinyint" or
+                "decimal" or "numeric" or "money" or "smallmoney" or
+                "float" or "real" => true,
+                _ => false
+            };
         }
 
         private UserControl CreateErrorControl(string message)
@@ -535,102 +540,187 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return errorControl;
         }
 
-
-        private List<string> GetNumericColumns(DataTable dataTable)
+        private UserControl CreateCorrelationHeatmap(CorrelationMatrix correlationMatrix)
         {
-            var numericColumns = new List<string>();
-
-            foreach (DataColumn column in dataTable.Columns)
+            if (correlationMatrix.Columns.Count < 2)
             {
-                if (IsNumericType(column.DataType))
-                {
-                    numericColumns.Add(column.ColumnName);
-                }
+                return CreateErrorControl("Insufficient correlation data available.");
             }
 
-            return numericColumns;
-        }
+            var columnNames = correlationMatrix.Columns;
+            var size = columnNames.Count;
 
-        private bool IsNumericType(Type dataType)
-        {
-            return dataType == typeof(int) || dataType == typeof(long) ||
-                   dataType == typeof(short) || dataType == typeof(byte) ||
-                   dataType == typeof(float) || dataType == typeof(double) ||
-                   dataType == typeof(decimal);
-        }
+            var containerControl = new UserControl();
+            var mainGrid = new Grid();
 
-        private double[,] CalculateCorrelationMatrix(DataTable dataTable, List<string> numericColumns)
-        {
-            int size = numericColumns.Count;
-            var correlationMatrix = new double[size, size];
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+            var titleBlock = new TextBlock
+            {
+                Text = "Correlation Heatmap",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(10)
+            };
+            Grid.SetRow(titleBlock, 0);
+            mainGrid.Children.Add(titleBlock);
+
+            // Create correlation matrix for SciChart
+            var correlationData = new double[size, size];
             for (int i = 0; i < size; i++)
             {
                 for (int j = 0; j < size; j++)
                 {
-                    if (i == j)
-                    {
-                        correlationMatrix[i, j] = 1.0;
-                    }
-                    else
-                    {
-                        var correlation = CalculatePearsonCorrelation(
-                            dataTable, numericColumns[i], numericColumns[j]);
-                        correlationMatrix[i, j] = correlation;
-                    }
+                    correlationData[i, j] = correlationMatrix.GetCorrelation(columnNames[i], columnNames[j]);
                 }
             }
 
-            return correlationMatrix;
+            // Create SciChart heatmap - use full available space
+            var sciChartSurface = new SciChartSurface
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Margin = new Thickness(5),
+                Background = Brushes.White,
+                Padding = new Thickness(10)
+            };
+
+            var heatmapDataSeries = new UniformHeatmapDataSeries<int, int, double>(correlationData, 0, 1, 0, 1);
+            var heatmapSeries = new FastUniformHeatmapRenderableSeries
+            {
+                DataSeries = heatmapDataSeries,
+                DrawTextInCell = true,
+                Opacity = 1.0
+            };
+
+            // Color map
+            var colorMap = new HeatmapColorPalette
+            {
+                Minimum = -1.0,
+                Maximum = 1.0
+            };
+
+            colorMap.GradientStops.Add(new GradientStop(Colors.Blue, 0.0));
+            colorMap.GradientStops.Add(new GradientStop(Colors.Cyan, 0.25));
+            colorMap.GradientStops.Add(new GradientStop(Colors.White, 0.5));
+            colorMap.GradientStops.Add(new GradientStop(Colors.Yellow, 0.75));
+            colorMap.GradientStops.Add(new GradientStop(Colors.Red, 1.0));
+
+            heatmapSeries.ColorMap = colorMap;
+
+            // Axes
+            var xAxis = new NumericAxis
+            {
+                AxisTitle = "Features",
+                VisibleRange = new DoubleRange(-0.5, size - 0.5),
+                MajorDelta = 1,
+                MinorDelta = 1,
+                DrawMinorTicks = false,
+                DrawMajorTicks = true,
+                DrawMajorGridLines = true,
+                DrawMinorGridLines = false,
+                DrawMajorBands = false,
+                AutoTicks = false,
+                LabelProvider = new FeatureNameLabelProvider(columnNames.ToArray()),
+                AxisAlignment = AxisAlignment.Bottom
+            };
+
+            var yAxis = new NumericAxis
+            {
+                AxisTitle = "Features",
+                VisibleRange = new DoubleRange(-0.5, size - 0.5),
+                MajorDelta = 1,
+                MinorDelta = 1,
+                DrawMinorTicks = false,
+                DrawMajorTicks = true,
+                DrawMajorGridLines = true,
+                DrawMinorGridLines = false,
+                DrawMajorBands = false,
+                AutoTicks = false,
+                LabelProvider = new ReversedFeatureNameLabelProvider(columnNames.ToArray()),
+                AxisAlignment = AxisAlignment.Left,
+                FlipCoordinates = true
+            };
+
+            sciChartSurface.XAxes.Add(xAxis);
+            sciChartSurface.YAxes.Add(yAxis);
+            sciChartSurface.RenderableSeries.Add(heatmapSeries);
+
+            sciChartSurface.ChartModifier = new ModifierGroup(
+                new MouseWheelZoomModifier(),
+                new RubberBandXyZoomModifier(),
+                new ZoomExtentsModifier(),
+                new ZoomPanModifier { ExecuteOn = ExecuteOn.MouseRightButton },
+                new CursorModifier { ShowTooltip = true, ShowAxisLabels = true },
+                new XAxisDragModifier(),
+                new YAxisDragModifier()
+            );
+
+            Grid.SetRow(sciChartSurface, 1);
+            mainGrid.Children.Add(sciChartSurface);
+
+            var legendPanel = CreateLegendPanel();
+            Grid.SetRow(legendPanel, 2);
+            mainGrid.Children.Add(legendPanel);
+
+            containerControl.Content = mainGrid;
+            return containerControl;
         }
 
-        private double CalculatePearsonCorrelation(DataTable dataTable, string column1, string column2)
+        private StackPanel CreateLegendPanel()
         {
-            var values1 = new List<double>();
-            var values2 = new List<double>();
-
-            foreach (DataRow row in dataTable.Rows)
+            var legendPanel = new StackPanel
             {
-                var val1 = row[column1];
-                var val2 = row[column2];
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(10)
+            };
 
-                if (val1 != null && val1 != DBNull.Value &&
-                    val2 != null && val2 != DBNull.Value &&
-                    double.TryParse(val1.ToString(), out double d1) &&
-                    double.TryParse(val2.ToString(), out double d2))
+            legendPanel.Children.Add(new TextBlock
+            {
+                Text = "Database-Computed Correlations: ",
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+
+            var legendItems = new[]
+            {
+                (Colors.Blue, "-1 (Strong Negative)"),
+                (Colors.Cyan, "-0.5 (Negative)"),
+                (Colors.White, "0 (No Correlation)"),
+                (Colors.Yellow, "0.5 (Positive)"),
+                (Colors.Red, "+1 (Strong Positive)")
+            };
+
+            foreach (var (color, description) in legendItems)
+            {
+                legendPanel.Children.Add(new Rectangle
                 {
-                    values1.Add(d1);
-                    values2.Add(d2);
-                }
+                    Width = 20,
+                    Height = 15,
+                    Fill = new SolidColorBrush(color),
+                    Margin = new Thickness(0, 0, 5, 0)
+                });
+
+                legendPanel.Children.Add(new TextBlock
+                {
+                    Text = description,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 15, 0),
+                    FontSize = 10
+                });
             }
 
-            if (values1.Count < 2)
-                return 0.0;
-
-            double mean1 = values1.Average();
-            double mean2 = values2.Average();
-
-            double numerator = 0;
-            double sumSq1 = 0;
-            double sumSq2 = 0;
-
-            for (int i = 0; i < values1.Count; i++)
-            {
-                double diff1 = values1[i] - mean1;
-                double diff2 = values2[i] - mean2;
-
-                numerator += diff1 * diff2;
-                sumSq1 += diff1 * diff1;
-                sumSq2 += diff2 * diff2;
-            }
-
-            double denominator = Math.Sqrt(sumSq1 * sumSq2);
-
-            return denominator == 0 ? 0.0 : numerator / denominator;
+            return legendPanel;
         }
 
-        
-        
+        #endregion
+
+        #region Label Providers for SciChart
 
         public class FeatureNameLabelProvider : LabelProviderBase
         {
@@ -645,13 +735,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 try
                 {
-                    
                     int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    
                     int reversedIndex = featureNames.Length - 1 - index;
                     if (reversedIndex >= 0 && reversedIndex < featureNames.Length)
                     {
-                        
                         string name = featureNames[reversedIndex];
                         return name.Length > 12 ? name.Substring(0, 12) + "..." : name;
                     }
@@ -668,10 +755,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 try
                 {
                     int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    
                     int reversedIndex = featureNames.Length - 1 - index;
                     if (reversedIndex >= 0 && reversedIndex < featureNames.Length)
-                        return featureNames[reversedIndex]; 
+                        return featureNames[reversedIndex];
                     return string.Empty;
                 }
                 catch
@@ -681,7 +767,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        
         public class ReversedFeatureNameLabelProvider : LabelProviderBase
         {
             private readonly string[] featureNames;
@@ -729,526 +814,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        private UserControl CreateCorrelationHeatmap(double[,] correlationMatrix, List<string> columnNames)
-        {
-            int size = columnNames.Count;
-
-            var containerControl = new UserControl();
-            var mainGrid = new Grid();
-
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            var titleBlock = new TextBlock
-            {
-                Text = "Correlation Heatmap",
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(10)
-            };
-            Grid.SetRow(titleBlock, 0);
-            mainGrid.Children.Add(titleBlock);
-
-            
-            var sciChartSurface = new SciChartSurface
-            {
-                Height = 650,
-                Width = 900,
-                Margin = new Thickness(5),
-                Background = Brushes.White,
-                Padding = new Thickness(10)
-            };
-
-            
-            var heatmapDataSeries = new UniformHeatmapDataSeries<int, int, double>(correlationMatrix, 0, 1, 0, 1);
-
-            
-            var heatmapSeries = new FastUniformHeatmapRenderableSeries
-            {
-                DataSeries = heatmapDataSeries,
-                DrawTextInCell = true,
-                Opacity = 1.0
-            };
-
-            
-            var colorMap = new HeatmapColorPalette
-            {
-                Minimum = -1.0,
-                Maximum = 1.0
-            };
-
-            
-            colorMap.GradientStops.Add(new GradientStop(Colors.Blue, 0.0));    
-            colorMap.GradientStops.Add(new GradientStop(Colors.Cyan, 0.25));   
-            colorMap.GradientStops.Add(new GradientStop(Colors.White, 0.5));   
-            colorMap.GradientStops.Add(new GradientStop(Colors.Yellow, 0.75)); 
-            colorMap.GradientStops.Add(new GradientStop(Colors.Red, 1.0));     
-
-            heatmapSeries.ColorMap = colorMap;
-
-            
-            string[] featureNames = columnNames.ToArray();
-
-            
-            var xAxis = new NumericAxis
-            {
-                AxisTitle = "Features",
-                VisibleRange = new DoubleRange(-0.5, size - 0.5),
-                MajorDelta = 1,
-                MinorDelta = 1,
-                DrawMinorTicks = false,
-                DrawMajorTicks = true,
-                DrawMajorGridLines = true,  
-                DrawMinorGridLines = false,
-                DrawMajorBands = false,
-                AutoTicks = false,
-                LabelProvider = new FeatureNameLabelProvider(featureNames),
-                AxisAlignment = AxisAlignment.Bottom
-            };
-
-            var yAxis = new NumericAxis
-            {
-                AxisTitle = "Features",
-                VisibleRange = new DoubleRange(-0.5, size - 0.5),
-                MajorDelta = 1,
-                MinorDelta = 1,
-                DrawMinorTicks = false,
-                DrawMajorTicks = true,
-                DrawMajorGridLines = true,  
-                DrawMinorGridLines = false,
-                DrawMajorBands = false,
-                AutoTicks = false,
-                
-                LabelProvider = new ReversedFeatureNameLabelProvider(featureNames),
-                AxisAlignment = AxisAlignment.Left,
-                FlipCoordinates = true
-            };
-
-            sciChartSurface.XAxes.Add(xAxis);
-            sciChartSurface.YAxes.Add(yAxis);
-            sciChartSurface.RenderableSeries.Add(heatmapSeries);
-
-            
-            sciChartSurface.ChartModifier = new ModifierGroup(
-                
-                new MouseWheelZoomModifier(),
-                
-                new RubberBandXyZoomModifier(),
-                
-                new ZoomExtentsModifier(),
-                
-                new ZoomPanModifier { ExecuteOn = ExecuteOn.MouseRightButton },
-                
-                new CursorModifier { ShowTooltip = true, ShowAxisLabels = true },
-                
-                new XAxisDragModifier(),
-                new YAxisDragModifier()
-            );
-
-            Grid.SetRow(sciChartSurface, 1);
-            mainGrid.Children.Add(sciChartSurface);
-
-            var legendPanel = CreateLegendPanel();
-            Grid.SetRow(legendPanel, 2);
-            mainGrid.Children.Add(legendPanel);
-
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-
-            
-            
-
-            containerControl.Content = mainGrid;
-            return containerControl;
-        }
-
-        private StackPanel CreateLegendPanel()
-        {
-            var legendPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(10)
-            };
-
-            legendPanel.Children.Add(new TextBlock
-            {
-                Text = "Legend: ",
-                FontWeight = FontWeights.Bold,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            });
-
-            
-            var legendItems = new[]
-            {
-                (Colors.Blue, "-1 (Strong Negative)"),
-                (Colors.Cyan, "-0.5 (Negative)"),
-                (Colors.Yellow, "0 (No Correlation)"),
-                (Colors.Orange, "0.5 (Positive)"),
-                (Colors.Red, "+1 (Strong Positive)")
-            };
-
-            foreach (var (color, description) in legendItems)
-            {
-                legendPanel.Children.Add(new Rectangle
-                {
-                    Width = 20,
-                    Height = 15,
-                    Fill = new SolidColorBrush(color),
-                    Margin = new Thickness(0, 0, 5, 0)
-                });
-
-                legendPanel.Children.Add(new TextBlock
-                {
-                    Text = description,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 15, 0),
-                    FontSize = 10
-                });
-            }
-
-            return legendPanel;
-        }
-
-
-
-        private async void AnalyzeData()
-        {
-            try
-            {
-                IsLoading = true;
-                LoadingMessage = "Validating configuration...";
-
-                var databaseConfig = _getDatabaseConfig?.Invoke();
-                var inputFields = _getInputFields?.Invoke();
-                
-                if (databaseConfig == null)
-                {
-                    _dialogService.ShowErrorDialog("Database configuration is not available.", "Error");
-                    return;
-                }
-
-                if (inputFields == null || !inputFields.Any())
-                {
-                    _dialogService.ShowErrorDialog("No input fields are configured.", "Error");
-                    return;
-                }
-
-                var enabledFields = inputFields.Where(f => f.IsEnabled).ToList();
-                if (!enabledFields.Any())
-                {
-                    _dialogService.ShowErrorDialog("No input fields are enabled for analysis.", "Error");
-                    return;
-                }
-
-                LoadingMessage = "Loading data from database...";
-                await Task.Delay(200);
-
-                var sqlHandler = new SqlHandler(databaseConfig.TableName);
-                sqlHandler.Connect(databaseConfig);
-                var connectionString = sqlHandler.GetConnectionString();
-
-                
-                var dataTable = await Task.Run(() =>
-                {
-                    var dataLoader = new DatabaseDataLoader();
-                    var enabledFieldNames = enabledFields.Select(f => f.Name).ToArray();
-
-                    
-                    var targetField = _getTargetField?.Invoke();
-                    var allFieldsForEDA = enabledFieldNames.ToList();
-                    if (!string.IsNullOrEmpty(targetField) && !allFieldsForEDA.Contains(targetField))
-                    {
-                        allFieldsForEDA.Add(targetField);
-                    }
-
-                    
-                    return LoadDataTableFromSql(
-                        connectionString,
-                        databaseConfig.TableName,
-                        allFieldsForEDA.ToArray(), 
-                        databaseConfig.WhereClause);
-                });
-
-                LoadingMessage = "Analyzing data patterns...";
-                await Task.Delay(200);
-
-                AnalyzeDataTable(dataTable);
-
-                _currentDataTable = dataTable;
-
-                LoadingMessage = "Setting up outlier detection...";
-                await Task.Delay(100);
-                
-                var targetField = _getTargetField?.Invoke();
-                _outlierDetectionViewModel.SetDataTable(dataTable, targetField);
-
-                LoadingMessage = "Preparing visualization data...";
-                await Task.Delay(50);
-
-                
-                var visualizationDataTable = await Task.Run(() => CreateDataTableWithoutTarget(dataTable, targetField));
-                _visualisationViewModel.SetDataTable(visualizationDataTable);
-
-                _dialogService.ShowInfoDialog($"Data analysis completed successfully for {enabledFields.Count} enabled fields.", "Analysis Complete");
-            }
-            catch (Exception ex)
-            {
-                _dialogService.ShowErrorDialog($"Error analyzing data: {ex.Message}", "Analysis Error");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        private DataTable LoadDataTableFromSql(string connectionString, string tableName, string[] fieldNames, string whereClause)
-        {
-            string fullTableName = tableName.Contains('[')
-                ? tableName 
-                : (tableName.Contains('.')
-                    ? string.Join('.', tableName.Split('.').Select(part => $"[{part}]"))
-                    : $"[{tableName}]");
-
-            var fieldNamesWithBrackets = fieldNames.Select(f => $"[{f}]");
-            var fieldsClause = string.Join(", ", fieldNamesWithBrackets);
-
-            var query = string.IsNullOrWhiteSpace(whereClause) 
-                ? $"SELECT {fieldsClause} FROM {fullTableName}"
-                : $"SELECT {fieldsClause} FROM {fullTableName} WHERE {whereClause}";
-
-            using var connection = new SqlConnection(connectionString);
-            using var command = new SqlCommand(query, connection);
-            using var adapter = new SqlDataAdapter(command);
-            
-            var dataTable = new DataTable();
-            connection.Open();
-            adapter.Fill(dataTable);
-            
-            return dataTable;
-        }
-
-        private void AnalyzeDataTable(DataTable dataTable)
-        {
-            NumberOfRows = dataTable.Rows.Count;
-            NumberOfColumns = dataTable.Columns.Count;
-
-            AnalyzeFeatureTypes(dataTable);
-
-            AnalyzeMissingValues(dataTable);
-        }
-
-        private void AnalyzeFeatureTypes(DataTable dataTable)
-        {
-            var typeGroups = dataTable.Columns.Cast<DataColumn>()
-                .GroupBy(col => GetFeatureType(col.DataType))
-                .Select(g => new FeatureTypeInfo 
-                { 
-                    Type = g.Key, 
-                    Count = g.Count() 
-                })
-                .OrderBy(x => x.Type);
-
-            FeatureTypes.Clear();
-            foreach (var typeInfo in typeGroups)
-            {
-                FeatureTypes.Add(typeInfo);
-            }
-        }
-
-        private void AnalyzeMissingValues(DataTable dataTable)
-        {
-            var columnMissingInfo = new List<ColumnMissingInfo>();
-            int totalCells = NumberOfRows * NumberOfColumns;
-            int totalMissing = 0;
-
-            foreach (DataColumn column in dataTable.Columns)
-            {
-                int missingCount = 0;
-                
-                foreach (DataRow row in dataTable.Rows)
-                {
-                    var value = row[column];
-                    if (value == null || value == DBNull.Value || 
-                        (value is string str && string.IsNullOrWhiteSpace(str)))
-                    {
-                        missingCount++;
-                    }
-                }
-
-                totalMissing += missingCount;
-                
-                double missingPercentage = NumberOfRows > 0 ? (double)missingCount / NumberOfRows * 100 : 0;
-                
-                columnMissingInfo.Add(new ColumnMissingInfo
-                {
-                    ColumnName = column.ColumnName,
-                    MissingCount = missingCount,
-                    MissingPercentage = missingPercentage
-                });
-            }
-
-            TotalMissingValues = totalMissing;
-            MissingValuesPercentage = totalCells > 0 ? (double)totalMissing / totalCells * 100 : 0;
-
-            ColumnMissingValues.Clear();
-            foreach (var info in columnMissingInfo.OrderByDescending(x => x.MissingCount))
-            {
-                ColumnMissingValues.Add(info);
-            }
-        }
-
-        private string GetFeatureType(Type dataType)
-        {
-            if (dataType == typeof(int) || dataType == typeof(long) || 
-                dataType == typeof(short) || dataType == typeof(byte) ||
-                dataType == typeof(float) || dataType == typeof(double) || 
-                dataType == typeof(decimal))
-            {
-                return "Numeric";
-            }
-            else if (dataType == typeof(bool))
-            {
-                return "Boolean";
-            }
-            else if (dataType == typeof(DateTime))
-            {
-                return "Date";
-            }
-            else if (dataType == typeof(string))
-            {
-                return "Text/Categorical";
-            }
-            else
-            {
-                return "Other";
-            }
-        }
-
-        private DataTable CreateSampledDataTable(DataTable originalTable, string? targetField)
-        {
-            var sampleSize = Math.Min(_maxSampleSize, originalTable.Rows.Count);
-            var step = Math.Max(1, originalTable.Rows.Count / sampleSize);
-
-            
-            var sampledTable = new DataTable();
-
-            
-            foreach (DataColumn column in originalTable.Columns)
-            {
-                if (string.IsNullOrEmpty(targetField) || column.ColumnName != targetField)
-                {
-                    sampledTable.Columns.Add(column.ColumnName, column.DataType);
-                }
-            }
-
-            
-            for (int i = 0; i < originalTable.Rows.Count && sampledTable.Rows.Count < sampleSize; i += step)
-            {
-                var originalRow = originalTable.Rows[i];
-                var newRow = sampledTable.NewRow();
-
-                foreach (DataColumn column in sampledTable.Columns)
-                {
-                    newRow[column.ColumnName] = originalRow[column.ColumnName];
-                }
-
-                sampledTable.Rows.Add(newRow);
-            }
-
-            return sampledTable;
-        }
-
-        private DataTable CreateDataTableWithoutTarget(DataTable originalTable, string? targetField)
-        {
-            
-            if (string.IsNullOrEmpty(targetField) || !originalTable.Columns.Contains(targetField))
-            {
-                return originalTable;
-            }
-
-            
-            if (_useDataSampling && originalTable.Rows.Count > _maxSampleSize)
-            {
-                return CreateSampledDataTable(originalTable, targetField);
-            }
-
-            
-            var filteredTable = new DataTable();
-
-            
-            foreach (DataColumn column in originalTable.Columns)
-            {
-                if (column.ColumnName != targetField)
-                {
-                    filteredTable.Columns.Add(column.ColumnName, column.DataType);
-                }
-            }
-
-            
-            var columnIndices = new List<int>();
-
-            for (int i = 0; i < originalTable.Columns.Count; i++)
-            {
-                if (originalTable.Columns[i].ColumnName != targetField)
-                {
-                    columnIndices.Add(i);
-                }
-            }
-
-            
-            foreach (DataRow originalRow in originalTable.Rows)
-            {
-                var newRow = filteredTable.NewRow();
-                var originalItems = originalRow.ItemArray;
-
-                for (int i = 0; i < columnIndices.Count; i++)
-                {
-                    newRow[i] = originalItems[columnIndices[i]];
-                }
-
-                filteredTable.Rows.Add(newRow);
-            }
-
-            return filteredTable;
-        }
-
-
-        public void ClearMemoryCache()
-        {
-            
-            _featureTypes?.Clear();
-            _columnMissingValues?.Clear();
-
-            
-            if (_useDataSampling)
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-            }
-        }
+        #endregion
 
         public new void Dispose()
         {
-            ClearMemoryCache();
-            _visualisationViewModel = null!;
-            _outlierDetectionViewModel = null!;
+            _visualisationViewModel?.Dispose();
+            _outlierDetectionViewModel?.Dispose();
+            base.Dispose();
         }
-
-        #endregion
     }
+
+    #region Supporting Classes
 
     public class FeatureTypeInfo
     {
@@ -1263,28 +839,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double MissingPercentage { get; set; }
     }
 
-    
-    public class BinaryClassificationDataPoint
+    public class DatabaseDataInfo
     {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public bool Label { get; set; }
+        public string ConnectionString { get; set; } = string.Empty;
+        public string TableName { get; set; } = string.Empty;
+        public string[] Columns { get; set; } = Array.Empty<string>();
+        public string? WhereClause { get; set; }
+        public bool IsCleanedData { get; set; }
+        public int RowCount { get; set; }
     }
 
-    public class MultiClassDataPoint
-    {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public uint Label { get; set; }
-    }
-
-    public class RegressionDataPoint
-    {
-        [VectorType]
-        public float[] Features { get; set; } = Array.Empty<float>();
-        
-        public float Label { get; set; }
-    }
+    #endregion
 }

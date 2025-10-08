@@ -48,6 +48,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string _loadingMessage = "Loading data...";
         private VisualisationViewModel _visualisationViewModel;
         private OutlierDetectionViewModel _outlierDetectionViewModel;
+        private ScatterPlotViewModel _scatterPlotViewModel;
         private UserControl? _correlationHeatmapChart;
 
         // Database-side analytics data
@@ -66,6 +67,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _columnMissingValues = new ObservableCollection<ColumnMissingInfo>();
             _visualisationViewModel = new VisualisationViewModel(dialogService, _databaseAnalytics);
             _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService, _databaseAnalytics);
+            _scatterPlotViewModel = new ScatterPlotViewModel(dialogService, _databaseAnalytics);
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
             GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
@@ -131,6 +133,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _outlierDetectionViewModel;
             set => SetProperty(ref _outlierDetectionViewModel, value);
+        }
+
+        public ScatterPlotViewModel ScatterPlotViewModel
+        {
+            get => _scatterPlotViewModel;
+            set => SetProperty(ref _scatterPlotViewModel, value);
         }
 
         public UserControl? CorrelationHeatmapChart
@@ -383,6 +391,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 // Set up outlier detection with database analytics
                 _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
 
+                // Set up scatter plot with database analytics
+                _scatterPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +
                     $"Dataset: {NumberOfRows:N0} rows � {NumberOfColumns} columns\n" +
@@ -514,6 +525,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private bool IsNumericType(string dataType)
         {
+            if (string.IsNullOrEmpty(dataType))
+                return false;
+
             return dataType.ToLower() switch
             {
                 "int" or "bigint" or "smallint" or "tinyint" or

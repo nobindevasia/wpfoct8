@@ -95,11 +95,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public void SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? whereClause = null)
         {
+            Console.WriteLine($"=== SetDatabaseConnection called ===");
+            Console.WriteLine($"ConnectionString: {connectionString?.Length} chars");
+            Console.WriteLine($"TableName: {tableName}");
+            Console.WriteLine($"Columns: {columns?.Length ?? 0} columns");
+            if (columns != null && columns.Length > 0)
+            {
+                Console.WriteLine($"Column names: {string.Join(", ", columns)}");
+            }
+
             _connectionString = connectionString;
             _tableName = tableName;
             _columns = columns;
             _whereClause = whereClause;
             UpdateDataInfo();
+
+            Console.WriteLine($"CanGenerateHistograms: {CanGenerateHistograms()}");
         }
 
         public async Task GenerateHistogramPreviewsAsync()
@@ -128,13 +139,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Console.WriteLine("Retrieving table schema...");
                 var schema = await _databaseAnalytics.GetTableSchemaAsync(_connectionString, _tableName);
                 Console.WriteLine($"✓ Schema retrieved: {schema.Count} columns found");
+                Console.WriteLine($"Schema columns: {string.Join(", ", schema.Select(s => s.ColumnName))}");
+                Console.WriteLine($"Requested columns: {string.Join(", ", _columns)}");
 
                 var availableColumns = _columns.Where(col => schema.Any(s => s.ColumnName.Equals(col, StringComparison.OrdinalIgnoreCase))).ToArray();
-                Console.WriteLine($"✓ Available columns: {string.Join(", ", availableColumns)}");
+                Console.WriteLine($"✓ Available columns after matching: {string.Join(", ", availableColumns)}");
 
                 if (!availableColumns.Any())
                 {
-                    _dialogService.ShowErrorDialog("No valid columns found for visualization.", "Data Error");
+                    Console.WriteLine("✗ ERROR: No columns matched between requested columns and schema!");
+                    Console.WriteLine($"✗ Requested: [{string.Join("], [", _columns)}]");
+                    Console.WriteLine($"✗ Schema has: [{string.Join("], [", schema.Select(s => s.ColumnName))}]");
+                    _dialogService.ShowErrorDialog(
+                        $"No valid columns found for visualization.\n\n" +
+                        $"Requested {_columns.Length} columns but none exist in table '{_tableName}'.\n" +
+                        $"Schema has {schema.Count} columns: {string.Join(", ", schema.Select(s => s.ColumnName).Take(5))}{(schema.Count > 5 ? "..." : "")}",
+                        "Data Error");
                     return;
                 }
 
@@ -304,7 +324,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     {
                         _dialogService.ShowInfoDialog($"Testing histogram steps on column: {firstNumericColumn}", "Histogram Test");
 
-                        var histogramDebugInfo = await _databaseAnalytics.DebugHistogramStepsAsync(_connectionString, _tableName, firstNumericColumn);
+                        var histogramDebugInfo = await _databaseAnalytics.DebugHistogramStepsAsync(_connectionString, _tableName, firstNumericColumn, 10, _whereClause);
                         _dialogService.ShowInfoDialog($"Histogram debug results:\n{histogramDebugInfo}", "Histogram Debug Results");
                     }
                     else

@@ -320,7 +320,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     {
                         OutlierResults.Add(new OutlierDetectionResult
                         {
-                            RowIndex = (int)outlier.RowId,
+                            RowIndex = Convert.ToInt32(outlier.RowId),
                             Value = outlier.Value,
                             Score = outlier.Score,
                             Method = SelectedMethod.ToString(),
@@ -1164,8 +1164,40 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 CurrentColumnBeingProcessed = "";
                 WinsorizationProgress = "Generating view definition with winsorization logic";
 
+                // Get ALL columns from the table (not just _columns) to ensure ReportDateTime and other columns are included
+                var allTableColumns = new List<string>();
+
+                // Parse schema and table name
+                string schemaName = "dbo";
+                string actualTableName = _tableName;
+                if (_tableName.Contains('.'))
+                {
+                    var parts = _tableName.Split('.');
+                    if (parts.Length == 2)
+                    {
+                        schemaName = parts[0];
+                        actualTableName = parts[1];
+                    }
+                }
+
+                var schemaQuery = $@"
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = '{schemaName}'
+                    AND TABLE_NAME = '{actualTableName}'
+                    ORDER BY ORDINAL_POSITION";
+
+                using (var schemaCommand = new Microsoft.Data.SqlClient.SqlCommand(schemaQuery, connection))
+                {
+                    using var schemaReader = await schemaCommand.ExecuteReaderAsync();
+                    while (await schemaReader.ReadAsync())
+                    {
+                        allTableColumns.Add(schemaReader.GetString(0));
+                    }
+                }
+
                 var selectColumns = new List<string>();
-                foreach (var col in _columns ?? new string[0])
+                foreach (var col in allTableColumns)
                 {
                     if (selectedColumns.Contains(col) && percentileCalculations.ContainsKey(col))
                     {

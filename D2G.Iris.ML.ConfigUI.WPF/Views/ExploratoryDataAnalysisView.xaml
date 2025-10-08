@@ -180,6 +180,10 @@
                 <views:OutlierDetectionView DataContext="{Binding OutlierDetectionViewModel}"/>
             </TabItem>
 
+            <TabItem Header="Scatter Plot">
+                <views:ScatterPlotView DataContext="{Binding ScatterPlotViewModel}"/>
+            </TabItem>
+
             <TabItem Header="Correlation Heatmap">
                 <Grid>
                     <Grid.RowDefinitions>

@@ -107,15 +107,12 @@ namespace D2G.Iris.ML.Data
                 {
                     try
                     {
-                        // Determine if data has been transformed in-memory or is still SQL-backed
                         bool hasInMemoryTransformations =
                             config.DataBalancing.Method != DataBalanceMethod.None ||
                             config.FeatureEngineering.Method == FeatureSelectionMethod.PCA;
 
                         if (hasInMemoryTransformations)
                         {
-                            // Data has been transformed in-memory (SMOTE, PCA)
-                            // Must use memory-based bulk insert
                             _sqlHandler.SaveToSql(
                                 config.Database.OutputTableName,
                                 processedData,
@@ -125,8 +122,6 @@ namespace D2G.Iris.ML.Data
                         }
                         else
                         {
-                            // Data is still SQL-backed (no transformations or just feature selection)
-                            // Can use direct SQL-to-SQL copy (zero memory)
                             _sqlHandler.CopySqlToSql(
                                 sourceTableOrView: config.Database.TableName,
                                 targetTable: config.Database.OutputTableName,

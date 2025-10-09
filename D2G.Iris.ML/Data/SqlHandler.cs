@@ -98,15 +98,10 @@ namespace D2G.Iris.ML.Data
             if (!targetCol.HasValue)
                 throw new InvalidOperationException($"Target column '{targetField}' not found");
 
-            // CRITICAL: Enumerate IDataView using EXISTING connection BEFORE opening new connection
-            // This is essential when data is backed by SQL queries (views, tables)
-
-            // Use the existing connection string (same database context as the source)
             using (var sourceConnection = new SqlConnection(GetConnectionString()))
             {
                 sourceConnection.Open();
 
-                // Get cursor for all needed columns
                 DataViewRowCursor cursor;
                 try
                 {
@@ -136,7 +131,6 @@ namespace D2G.Iris.ML.Data
                     targetBoolGetter = cursor.GetGetter<bool>(targetCol.Value);
                 }
 
-                // Enumerate and populate DataTable while source connection is active
                 var featureBuffer = default(VBuffer<float>);
                 try
                 {
@@ -180,13 +174,10 @@ namespace D2G.Iris.ML.Data
                 {
                     cursor.Dispose();
                 }
-            } // Source connection closes here - data is now fully in memory
-
-            // Now open NEW connection for writing (can be different database)
+            }
             using var connection = new SqlConnection(GetConnectionString());
             connection.Open();
 
-            // If output database is specified and different, switch database context
             if (!string.IsNullOrEmpty(outputDatabase))
             {
                 using var useDbCmd = new SqlCommand($"USE [{outputDatabase}]", connection);
@@ -203,11 +194,11 @@ namespace D2G.Iris.ML.Data
                 });
 
             string createSql = $@"
-                    IF OBJECT_ID(N'{tableNameOnly}', N'U') IS NOT NULL
-                    DROP TABLE {tableNameOnly};
-                    CREATE TABLE {tableNameOnly} (
-                    {string.Join(",\n    ", columnDefinitions)}
-                    );";
+                IF OBJECT_ID(N'{tableNameOnly}', N'U') IS NOT NULL
+                DROP TABLE {tableNameOnly};
+                CREATE TABLE {tableNameOnly} (
+                {string.Join(",\n    ", columnDefinitions)}
+                );";
 
             using (var cmd = new SqlCommand(createSql, connection))
             {
@@ -242,8 +233,6 @@ namespace D2G.Iris.ML.Data
                 throw new ArgumentException("Source table/view name must be provided.", nameof(sourceTableOrView));
             if (string.IsNullOrWhiteSpace(targetTable))
                 throw new ArgumentException("Target table name must be provided.", nameof(targetTable));
-
-            // Parse target database name from table name if specified
             string outputDatabase = null;
             string tableNameOnly = targetTable;
 
@@ -267,18 +256,15 @@ namespace D2G.Iris.ML.Data
             using var connection = new SqlConnection(GetConnectionString());
             connection.Open();
 
-            // Switch database context if needed
             if (!string.IsNullOrEmpty(outputDatabase))
             {
                 using var useDbCmd = new SqlCommand($"USE [{outputDatabase}]", connection);
                 useDbCmd.ExecuteNonQuery();
+                Console.WriteLine($"Switched to database: {outputDatabase}");
             }
-
-            // Build column list
             var columnList = string.Join(", ", featureNames.Select(f => $"[{f}]"));
             columnList += $", [{targetField}]";
 
-            // Build column definitions for CREATE TABLE
             var columnDefinitions = featureNames
                 .Select(f => $"[{f}] FLOAT")
                 .Concat(new[]
@@ -287,7 +273,6 @@ namespace D2G.Iris.ML.Data
                     "ProcessedDateTime DATETIME DEFAULT GETDATE()"
                 });
 
-            // Create target table
             string createTableSql = $@"
                 IF OBJECT_ID(N'{tableNameOnly}', N'U') IS NOT NULL
                     DROP TABLE {tableNameOnly};
@@ -303,10 +288,7 @@ namespace D2G.Iris.ML.Data
 
             Console.WriteLine($"Created target table: {tableNameOnly}");
 
-            // Build WHERE clause
             var whereClauseSql = string.IsNullOrWhiteSpace(whereClause) ? "" : $"WHERE {whereClause}";
-
-            // Insert data directly from source to target (pure SQL, zero memory)
             string insertSql = $@"
                 INSERT INTO {tableNameOnly} ({columnList})
                 SELECT {columnList}
@@ -315,7 +297,7 @@ namespace D2G.Iris.ML.Data
 
             using (var insertCmd = new SqlCommand(insertSql, connection))
             {
-                insertCmd.CommandTimeout = 300; // 5 minutes for large datasets
+                insertCmd.CommandTimeout = 300;
                 var rowsAffected = insertCmd.ExecuteNonQuery();
                 Console.WriteLine($"Copied {rowsAffected:N0} rows using direct SQL INSERT (zero memory usage)");
             }

@@ -240,7 +240,7 @@
                     <TextBox Grid.Column="2"
                              Text="{Binding IntermediateResultsSchema, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource CompactInputStyle}"
-                             ToolTip="Schema name (default: dbo)"/>
+                             ToolTip="Schema name (optional)"/>
                 </Grid>
 
                 <!-- Table Name -->

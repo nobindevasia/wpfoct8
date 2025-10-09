@@ -107,14 +107,34 @@ namespace D2G.Iris.ML.Data
                 {
                     try
                     {
-                        _sqlHandler.SaveToSql(
-                            config.Database.OutputTableName,
-                            processedData,
-                            currentFeatures,
-                            config.TargetField,
-                            config.ModelType);
+                        // Determine if data has been transformed in-memory or is still SQL-backed
+                        bool hasInMemoryTransformations =
+                            config.DataBalancing.Method != DataBalanceMethod.None ||
+                            config.FeatureEngineering.Method == FeatureSelectionMethod.PCA;
 
-                        Console.WriteLine($"Processed data saved to: {config.Database.OutputTableName}");
+                        if (hasInMemoryTransformations)
+                        {
+                            // Data has been transformed in-memory (SMOTE, PCA)
+                            // Must use memory-based bulk insert
+                            _sqlHandler.SaveToSql(
+                                config.Database.OutputTableName,
+                                processedData,
+                                currentFeatures,
+                                config.TargetField,
+                                config.ModelType);
+                        }
+                        else
+                        {
+                            // Data is still SQL-backed (no transformations or just feature selection)
+                            // Can use direct SQL-to-SQL copy (zero memory)
+                            _sqlHandler.CopySqlToSql(
+                                sourceTableOrView: config.Database.TableName,
+                                targetTable: config.Database.OutputTableName,
+                                featureNames: currentFeatures,
+                                targetField: config.TargetField,
+                                modelType: config.ModelType,
+                                whereClause: config.Database.WhereClause);
+                        }
                     }
                     catch (Exception ex)
                     {

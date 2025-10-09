@@ -11,7 +11,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private readonly FeatureEngineeringViewModel _featureEngineeringViewModel;
         private string _intermediateResultsTableName = "";
         private string _intermediateResultsDatabase = "";
-        private string _intermediateResultsSchema = "dbo";
+        private string _intermediateResultsSchema = "";
 
         public DataProcessingPipelineViewModel()
         {
@@ -127,8 +127,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 if (!string.IsNullOrWhiteSpace(_intermediateResultsSchema))
                     parts.Add($"[{_intermediateResultsSchema}]");
-                else
-                    parts.Add("[dbo]");
 
                 if (!string.IsNullOrWhiteSpace(_intermediateResultsTableName))
                     parts.Add($"[{_intermediateResultsTableName}]");
@@ -196,7 +194,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _featureEngineeringViewModel.SetConfiguration(null);
             IntermediateResultsTableName = "";
             IntermediateResultsDatabase = "";
-            IntermediateResultsSchema = "dbo";
+            IntermediateResultsSchema = "";
         }
 
         private void ParseFullTableName(string fullTableName)
@@ -205,7 +203,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 IntermediateResultsTableName = "";
                 IntermediateResultsDatabase = "";
-                IntermediateResultsSchema = "dbo";
+                IntermediateResultsSchema = "";
                 return;
             }
 
@@ -228,7 +226,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             else
             {
                 IntermediateResultsDatabase = "";
-                IntermediateResultsSchema = "dbo";
+                IntermediateResultsSchema = "";
                 IntermediateResultsTableName = parts[0];
             }
         }

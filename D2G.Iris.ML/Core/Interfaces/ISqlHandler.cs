@@ -14,6 +14,14 @@ namespace D2G.Iris.ML.Core.Interfaces
             string[] featureNames,
             string targetField,
             ModelType modelType);
-     
+
+        void CopySqlToSql(
+            string sourceTableOrView,
+            string targetTable,
+            string[] featureNames,
+            string targetField,
+            ModelType modelType,
+            string whereClause = null);
+
     }
 }

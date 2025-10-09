@@ -51,7 +51,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private ScatterPlotViewModel _scatterPlotViewModel;
         private UserControl? _correlationHeatmapChart;
 
-        // Database-side analytics data
         private DatasetSummary? _currentDatasetSummary;
         private List<ColumnStatistics>? _currentColumnStatistics;
         private string? _connectionString;
@@ -175,16 +174,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return _outlierDetectionViewModel.HasOutliersBeenRemoved();
         }
 
-        /// <summary>
-        /// Clean up the winsorized/cleaned database view after training is complete.
-        /// This removes the temporary view from the database.
-        /// </summary>
         public void CleanupAfterTraining()
         {
             _outlierDetectionViewModel.CleanupView();
         }
 
-        // For training - return cleaned data info or original data info
         public DatabaseDataInfo? GetDataForTraining()
         {
             if (_connectionString == null || _tableName == null || _enabledColumns == null)
@@ -208,7 +202,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             try
             {
-                // First try to get cleaned data directly from memory (for small datasets)
                 if (_outlierDetectionViewModel.IsUsingInMemoryData())
                 {
                     var cleanedDataView = _outlierDetectionViewModel.GetCleanedDataView();
@@ -219,20 +212,18 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     }
                 }
 
-                // Use database approach for cleaned data
                 var cleanedDataInfo = _outlierDetectionViewModel.GetCleanedDataInfo();
                 if (cleanedDataInfo == null)
                     return null;
 
                 Console.WriteLine("Falling back to database approach for cleaned data");
 
-                // Use the database data loader to create IDataView directly from database
                 var dataLoader = new DatabaseDataLoader();
                 var allColumns = featureColumns.Concat(new[] { targetColumn }).ToArray();
 
                 return dataLoader.LoadDataFromSql(
                     _connectionString,
-                    cleanedDataInfo.TableName, // This might be a temp table with cleaned data
+                    cleanedDataInfo.TableName,
                     allColumns,
                     modelType,
                     targetColumn,
@@ -293,7 +284,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return;
                 }
 
-                // Store connection info for later use
                 var sqlHandler = new SqlHandler(databaseConfig.TableName);
                 sqlHandler.Connect(databaseConfig);
                 _connectionString = sqlHandler.GetConnectionString();
@@ -320,7 +310,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Loading dataset summary...";
                 await Task.Delay(100);
 
-                // Get dataset summary
                 Console.WriteLine("Getting dataset summary...");
                 try
                 {
@@ -340,7 +329,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Analyzing column statistics...";
                 await Task.Delay(100);
 
-                // Get detailed column statistics
                 Console.WriteLine("Getting column statistics...");
                 try
                 {
@@ -357,13 +345,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Analyzing feature types...";
                 await Task.Delay(100);
 
-                // Update feature types
                 await UpdateFeatureTypesAsync();
 
                 LoadingMessage = "Analyzing missing values...";
                 await Task.Delay(100);
 
-                // Get missing values analysis
                 Console.WriteLine("Getting missing values analysis...");
                 try
                 {
@@ -382,16 +368,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Setting up visualization components...";
                 await Task.Delay(100);
 
-                // Set up visualization with database analytics
                 _visualisationViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
 
                 LoadingMessage = "Setting up outlier detection...";
                 await Task.Delay(100);
 
-                // Set up outlier detection with database analytics
                 _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
 
-                // Set up scatter plot with database analytics
                 _scatterPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
 
                 _dialogService.ShowInfoDialog(
@@ -446,7 +429,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Creating correlation heatmap...";
                 await Task.Delay(100);
 
-                // Create UI controls on the UI thread (not in Task.Run)
                 var correlationChart = CreateCorrelationHeatmap(correlationMatrix);
                 CorrelationHeatmapChart = correlationChart;
 
@@ -582,7 +564,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             Grid.SetRow(titleBlock, 0);
             mainGrid.Children.Add(titleBlock);
 
-            // Create correlation matrix for SciChart
             var correlationData = new double[size, size];
             for (int i = 0; i < size; i++)
             {
@@ -592,7 +573,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 }
             }
 
-            // Create SciChart heatmap - use full available space
             var sciChartSurface = new SciChartSurface
             {
                 HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -610,7 +590,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Opacity = 1.0
             };
 
-            // Color map
             var colorMap = new HeatmapColorPalette
             {
                 Minimum = -1.0,
@@ -625,7 +604,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             heatmapSeries.ColorMap = colorMap;
 
-            // Axes
             var xAxis = new NumericAxis
             {
                 AxisTitle = "Features",

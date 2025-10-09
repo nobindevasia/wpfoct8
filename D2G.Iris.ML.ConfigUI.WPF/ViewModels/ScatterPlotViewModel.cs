@@ -170,7 +170,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     _tableName,
                     _selectedXColumn,
                     _selectedYColumn,
-                    null,  // No limit - show all data points
+                    null,
                     _whereClause);
 
                 if (scatterData == null || !scatterData.Any())
@@ -179,11 +179,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return;
                 }
 
-                // Create data series - sort by X to avoid SciChart warning
                 var dataSeries = new XyDataSeries<double, double>
                 {
                     SeriesName = $"{_selectedXColumn} vs {_selectedYColumn}",
-                    AcceptsUnsortedData = true  // Allow unsorted data for scatter plots
+                    AcceptsUnsortedData = true
                 };
 
                 foreach (var point in scatterData)
@@ -193,7 +192,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 ScatterPlotData = dataSeries;
 
-                // Calculate correlation
                 ProgressMessage = "Calculating correlation...";
                 try
                 {
@@ -208,7 +206,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 }
                 catch (Exception corrEx)
                 {
-                    // If correlation fails, still show the plot with point count
                     CorrelationInfo = $"Correlation: N/A | Points: {scatterData.Count}";
                     Console.WriteLine($"Correlation calculation failed: {corrEx.Message}");
                 }

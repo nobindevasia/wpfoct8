@@ -21,9 +21,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             _connectionString = connectionString;
         }
 
-        /// <summary>
-        /// Get descriptive statistics for a numeric column
-        /// </summary>
         public async Task<ColumnStatistics> GetColumnStatisticsAsync(string tableName, string columnName)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -65,9 +62,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return null;
         }
 
-        /// <summary>
-        /// Get descriptive statistics for multiple columns
-        /// </summary>
         public async Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null)
         {
             var statistics = new List<ColumnStatistics>();
@@ -76,7 +70,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 await connection.OpenAsync();
                 var whereCondition = string.IsNullOrWhiteSpace(whereClause) ? "" : $" WHERE {whereClause}";
 
-                // Parse schema and table name
                 string schemaName = "dbo";
                 string actualTableName = tableName;
 
@@ -90,7 +83,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     }
                 }
 
-                // First get the data types for all columns
                 var dataTypeQuery = $@"
                     SELECT COLUMN_NAME, DATA_TYPE
                     FROM INFORMATION_SCHEMA.COLUMNS
@@ -149,9 +141,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return statistics;
         }
 
-        /// <summary>
-        /// Get percentiles for a numeric column (25th, 50th median, 75th)
-        /// </summary>
         public async Task<Percentiles> GetPercentilesAsync(string tableName, string columnName)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -185,9 +174,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return null;
         }
 
-        /// <summary>
-        /// Get value distribution (histogram) for a numeric column
-        /// </summary>
         public async Task<List<HistogramBin>> GetHistogramAsync(string tableName, string columnName, int binCount = 10)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -238,9 +224,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get frequency distribution for categorical columns
-        /// </summary>
         public async Task<List<CategoryFrequency>> GetCategoryFrequencyAsync(string tableName, string columnName, int topN = 20)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -277,9 +260,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get null counts and percentage for multiple columns
-        /// </summary>
         public async Task<List<ColumnNullInfo>> GetNullAnalysisAsync(string tableName, List<string> columns)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -323,9 +303,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get correlation between two numeric columns
-        /// </summary>
         public async Task<double> GetCorrelationAsync(string tableName, string column1, string column2)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -350,9 +327,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get distinct count (cardinality) for a column
-        /// </summary>
         public async Task<int> GetDistinctCountAsync(string tableName, string columnName)
         {
             using (var connection = new SqlConnection(_connectionString))
@@ -371,9 +345,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get outliers using IQR method
-        /// </summary>
         public async Task<OutlierInfo> GetOutliersAsync(string tableName, string columnName, double iqrMultiplier = 1.5)
         {
             var percentiles = await GetPercentilesAsync(tableName, columnName);
@@ -417,9 +388,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return null;
         }
 
-        /// <summary>
-        /// Get complete EDA summary for a numeric column
-        /// </summary>
         public async Task<NumericColumnSummary> GetNumericColumnSummaryAsync(string tableName, string columnName)
         {
             var statistics = await GetColumnStatisticsAsync(tableName, columnName);
@@ -437,9 +405,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             };
         }
 
-        /// <summary>
-        /// Get dataset summary including row count, column count, and missing value analysis
-        /// </summary>
         public async Task<DatasetSummary> GetDatasetSummaryAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null)
         {
             using (var connection = new SqlConnection(connectionString))
@@ -448,7 +413,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 var whereCondition = string.IsNullOrWhiteSpace(whereClause) ? "" : $" WHERE {whereClause}";
 
-                // Get total row count
                 var countQuery = $"SELECT COUNT(*) FROM {tableName}{whereCondition}";
                 long totalRows;
                 using (var command = new SqlCommand(countQuery, connection))
@@ -456,7 +420,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     totalRows = (int)await command.ExecuteScalarAsync();
                 }
 
-                // Get missing value info for all columns
                 var missingValueInfoList = new List<MissingValueInfo>();
                 foreach (var column in columns)
                 {
@@ -496,9 +459,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get correlation matrix for multiple numeric columns
-        /// </summary>
         public async Task<CorrelationMatrix> GetCorrelationMatrixAsync(string connectionString, string tableName, IEnumerable<string> numericColumns, string? whereClause = null)
         {
             var columnsList = numericColumns.ToList();
@@ -527,7 +487,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                             var col1 = columnsList[i];
                             var col2 = columnsList[j];
 
-                            // Build the WHERE clause properly
                             var nullCheckCondition = $"{col1} IS NOT NULL AND {col2} IS NOT NULL";
                             var fullWhereClause = string.IsNullOrWhiteSpace(whereClause)
                                 ? $" WHERE {nullCheckCondition}"
@@ -558,9 +517,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return correlationMatrix;
         }
 
-        /// <summary>
-        /// Test database connection
-        /// </summary>
         public async Task<bool> TestConnectionAsync(string connectionString)
         {
             try
@@ -577,18 +533,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get missing values analysis for columns
-        /// </summary>
         public async Task<List<MissingValueInfo>> GetMissingValuesAnalysisAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null)
         {
             var datasetSummary = await GetDatasetSummaryAsync(connectionString, tableName, columns, whereClause);
             return datasetSummary.MissingValues;
         }
 
-        /// <summary>
-        /// Detect outliers using specified method
-        /// </summary>
         public async Task<List<OutlierResult>> DetectOutliersAsync(string connectionString, string tableName, string columnName, OutlierDetectionMethod method, double threshold, string? whereClause = null)
         {
             var outliers = new List<OutlierResult>();
@@ -656,7 +606,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 }
                 else if (method == OutlierDetectionMethod.ModifiedZScore)
                 {
-                    // Build proper WHERE clauses for each CTE
                     var statsWhere = string.IsNullOrWhiteSpace(whereClause)
                         ? $" WHERE {columnName} IS NOT NULL"
                         : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL";
@@ -718,9 +667,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return outliers;
         }
 
-        /// <summary>
-        /// Get table schema information
-        /// </summary>
         public async Task<List<TableSchemaInfo>> GetTableSchemaAsync(string connectionString, string tableName)
         {
             var schema = new List<TableSchemaInfo>();
@@ -728,7 +674,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             {
                 await connection.OpenAsync();
 
-                // Parse schema and table name
                 string schemaName = "dbo";
                 string actualTableName = tableName;
 
@@ -773,9 +718,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return schema;
         }
 
-        /// <summary>
-        /// Get histogram data for a column
-        /// </summary>
         public async Task<List<HistogramBin>> GetHistogramDataAsync(string connectionString, string tableName, string columnName, int binCount, string? whereClause = null)
         {
             using (var connection = new SqlConnection(connectionString))
@@ -826,9 +768,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Get categorical data frequency
-        /// </summary>
         public async Task<List<CategoryFrequency>> GetCategoricalDataAsync(string connectionString, string tableName, string columnName, int topN, string? whereClause = null)
         {
             using (var connection = new SqlConnection(connectionString))
@@ -866,33 +805,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
 
-        /// <summary>
-        /// Debug histogram steps
-        /// </summary>
         public async Task<string> DebugHistogramStepsAsync(string connectionString, string tableName, string columnName, int binCount, string? whereClause = null)
         {
-            // Debug implementation - just log to console
             var histogram = await GetHistogramDataAsync(connectionString, tableName, columnName, binCount, whereClause);
             var debugMessage = $"Histogram for {columnName}: {histogram.Count} bins";
             Console.WriteLine(debugMessage);
             return debugMessage;
         }
 
-        /// <summary>
-        /// Debug basic operations
-        /// </summary>
         public async Task<string> DebugBasicOperationsAsync(string connectionString, string tableName, string? whereClause = null)
         {
-            // Debug implementation - just test connection
             var canConnect = await TestConnectionAsync(connectionString);
             var debugMessage = $"Connection test: {canConnect}, Table: {tableName}";
             Console.WriteLine(debugMessage);
             return debugMessage;
         }
 
-        /// <summary>
-        /// Get scatter plot data for two numeric columns
-        /// </summary>
         public async Task<List<ScatterPlotPoint>> GetScatterPlotDataAsync(string connectionString, string tableName, string xColumn, string yColumn, int? maxPoints = null, string? whereClause = null)
         {
             var scatterPlotData = new List<ScatterPlotPoint>();
@@ -900,7 +828,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             {
                 await connection.OpenAsync();
 
-                // Build WHERE clause properly
                 var nullCheckCondition = $"{xColumn} IS NOT NULL AND {yColumn} IS NOT NULL";
                 var fullWhereClause = string.IsNullOrWhiteSpace(whereClause)
                     ? $" WHERE {nullCheckCondition}"

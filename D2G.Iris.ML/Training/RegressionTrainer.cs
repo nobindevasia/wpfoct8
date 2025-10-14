@@ -102,7 +102,11 @@ namespace D2G.Iris.ML.Training
                     OptimizingMetric = metric
                 };
 
-                TrySetMaxModels(config, experimentSettings);
+                // Limit the trainers if MaxModels is specified
+                if (config.AutoML.MaxModels > 0)
+                {
+                    LimitTrainers(experimentSettings, config.AutoML.MaxModels);
+                }
 
                 Console.WriteLine("Creating experiment...");
                 var experiment = mlContext.Auto().CreateRegressionExperiment(experimentSettings);
@@ -158,20 +162,45 @@ namespace D2G.Iris.ML.Training
             }
         }
 
-        private void TrySetMaxModels(ModelConfig config, RegressionExperimentSettings experimentSettings)
+        private void LimitTrainers(RegressionExperimentSettings experimentSettings, int maxModels)
         {
             try
             {
-                if (config.AutoML.MaxModels > 0)
+                // Access MaxModels field from the base ExperimentSettings class
+                var type = experimentSettings.GetType();
+                var maxModelsField = type.GetField("MaxModels", BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+
+                if (maxModelsField != null)
                 {
-                    PropertyInfo prop = experimentSettings.GetType().GetProperty("MaxModels");
-                    prop?.SetValue(experimentSettings, (uint)config.AutoML.MaxModels);
-                    Console.WriteLine($"Set MaxModels to {config.AutoML.MaxModels}");
+                    // Check the field type and convert accordingly
+                    if (maxModelsField.FieldType == typeof(uint))
+                    {
+                        maxModelsField.SetValue(experimentSettings, (uint)maxModels);
+                    }
+                    else if (maxModelsField.FieldType == typeof(int))
+                    {
+                        maxModelsField.SetValue(experimentSettings, maxModels);
+                    }
+                    else
+                    {
+                        maxModelsField.SetValue(experimentSettings, Convert.ChangeType(maxModels, maxModelsField.FieldType));
+                    }
+                    Console.WriteLine($"Set MaxModels to {maxModels}");
+                }
+                else
+                {
+                    Console.WriteLine($"Warning: MaxModels field not found");
+                    Console.WriteLine($"Available fields on {type.Name}:");
+                    foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
+                    {
+                        Console.WriteLine($"  - {field.Name} ({field.FieldType.Name}) DeclaringType={field.DeclaringType?.Name}");
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Note: Could not set MaxModels: {ex.Message}");
+                Console.WriteLine($"Error setting MaxModels: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
 

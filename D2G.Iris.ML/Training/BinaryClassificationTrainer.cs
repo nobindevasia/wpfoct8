@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.ML;
@@ -32,7 +33,7 @@ namespace D2G.Iris.ML.Training
             Console.WriteLine($"\nStarting binary classification using {(config.AutoML?.Enabled == true ? "AutoML" : config.TrainingParameters.Algorithm)}");
             try
             {
-                
+
                 IDataView labeledData;
 
                 if (dataView.Schema.GetColumnOrNull("Label").HasValue)
@@ -108,8 +109,15 @@ namespace D2G.Iris.ML.Training
                     OptimizingMetric = metric
                 };
 
+                // Limit the trainers if MaxModels is specified
+                if (config.AutoML.MaxModels > 0)
+                {
+                    LimitTrainers(experimentSettings, config.AutoML.MaxModels);
+                }
+
+                Console.WriteLine("Creating experiment...");
                 var experiment = mlContext.Auto()
-                    .CreateBinaryClassificationExperiment(experimentSettings.MaxExperimentTimeInSeconds);
+                    .CreateBinaryClassificationExperiment(experimentSettings);
 
                 var experimentStartTime = DateTime.Now;
                 var experimentResult = experiment.Execute(
@@ -313,6 +321,48 @@ namespace D2G.Iris.ML.Training
                 return _mlContext.Transforms.Concatenate("Features", featureNames)
                     .Fit(labeledData)
                     .Transform(labeledData);
+            }
+        }
+
+        private void LimitTrainers(BinaryExperimentSettings experimentSettings, int maxModels)
+        {
+            try
+            {
+                // Access MaxModels field from the base ExperimentSettings class
+                var type = experimentSettings.GetType();
+                var maxModelsField = type.GetField("MaxModels", BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
+
+                if (maxModelsField != null)
+                {
+                    // Check the field type and convert accordingly
+                    if (maxModelsField.FieldType == typeof(uint))
+                    {
+                        maxModelsField.SetValue(experimentSettings, (uint)maxModels);
+                    }
+                    else if (maxModelsField.FieldType == typeof(int))
+                    {
+                        maxModelsField.SetValue(experimentSettings, maxModels);
+                    }
+                    else
+                    {
+                        maxModelsField.SetValue(experimentSettings, Convert.ChangeType(maxModels, maxModelsField.FieldType));
+                    }
+                    Console.WriteLine($"Set MaxModels to {maxModels}");
+                }
+                else
+                {
+                    Console.WriteLine($"Warning: MaxModels field not found");
+                    Console.WriteLine($"Available fields on {type.Name}:");
+                    foreach (var field in type.GetFields(BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy))
+                    {
+                        Console.WriteLine($"  - {field.Name} ({field.FieldType.Name}) DeclaringType={field.DeclaringType?.Name}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error setting MaxModels: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
     }

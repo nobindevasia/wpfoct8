@@ -13,7 +13,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         private bool _isEnabled;
         private int _maxExperimentTimeInSeconds = 30;
+        private int _maxModelsToTry = 10;
         private string _optimizingMetric = "Accuracy";
+        private bool _useCrossValidation = false;
+        private int _numberOfFolds = 5;
         private string _description = "AutoML is disabled. Traditional training will be used with the algorithm specified in Training Parameters.";
 
         public AutoMLSettingsViewModel()
@@ -42,10 +45,28 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _maxExperimentTimeInSeconds, System.Math.Max(1, System.Math.Min(3600, value)));
         }
 
+        public int MaxModelsToTry
+        {
+            get => _maxModelsToTry;
+            set => SetProperty(ref _maxModelsToTry, System.Math.Max(1, System.Math.Min(1000, value)));
+        }
+
         public string OptimizingMetric
         {
             get => _optimizingMetric;
             set => SetProperty(ref _optimizingMetric, value);
+        }
+
+        public bool UseCrossValidation
+        {
+            get => _useCrossValidation;
+            set => SetProperty(ref _useCrossValidation, value);
+        }
+
+        public int NumberOfFolds
+        {
+            get => _numberOfFolds;
+            set => SetProperty(ref _numberOfFolds, System.Math.Max(2, System.Math.Min(10, value)));
         }
 
         public string Description
@@ -69,12 +90,18 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 IsEnabled = false;
                 MaxExperimentTimeInSeconds = 30;
+                MaxModelsToTry = 10;
                 OptimizingMetric = "Accuracy";
+                UseCrossValidation = false;
+                NumberOfFolds = 5;
                 return;
             }
             IsEnabled = config.Enabled;
             MaxExperimentTimeInSeconds = config.MaxExperimentTimeInSeconds;
+            MaxModelsToTry = config.MaxModels;
             OptimizingMetric = config.OptimizingMetric ?? "Accuracy";
+            UseCrossValidation = config.UseCrossValidation;
+            NumberOfFolds = config.NumberOfFolds;
         }
 
         public AutoMLConfig GetConfiguration()
@@ -83,7 +110,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 Enabled = IsEnabled,
                 MaxExperimentTimeInSeconds = MaxExperimentTimeInSeconds,
-                OptimizingMetric = OptimizingMetric
+                MaxModels = MaxModelsToTry,
+                OptimizingMetric = OptimizingMetric,
+                UseCrossValidation = UseCrossValidation,
+                NumberOfFolds = NumberOfFolds
             };
         }
 

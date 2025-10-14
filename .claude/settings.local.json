@@ -38,7 +38,11 @@
       "Read(/C:\\Users\\n.devasia\\Pictures\\Latest\\D2G.Iris.ML.ConfigUI.WPF\\Commands/**)",
       "Read(//c/Users/n.devasia/Desktop/**)",
       "Bash(git log:*)",
-      "Bash(Select-String \"error CS\")"
+      "Bash(Select-String \"error CS\")",
+      "Bash(dir \"C:\\Users\\n.devasia\\Desktop\\Code\\Latest\\D2G.Iris.ML.ConfigUI.WPF\\obj\\Debug\\net8.0-windows\\Views\\AutoMLSettingsView.g.i.cs\")",
+      "Bash(dotnet run)",
+      "Bash(Get-Content \"C:\\Users\\n.devasia\\Desktop\\Code\\Latest\\D2G.Iris.ML.ConfigUI.WPF\\Views\\AutoMLSettingsView.xaml\")",
+      "Bash(Select-String -Pattern \"Grid.Row=\" -Context 0,1)"
     ],
     "deny": [],
     "ask": []

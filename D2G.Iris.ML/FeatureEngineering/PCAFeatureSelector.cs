@@ -84,7 +84,11 @@ namespace D2G.Iris.ML.FeatureEngineering
                         schemaDefinition: schemaOutF)
                         .ToList();
 
-                    var outputDataF = mlContext.Data.LoadFromEnumerable(resultF);
+                    var schemaLoadF = SchemaDefinition.Create(typeof(PcaOutputRowFloat));
+                    schemaLoadF["Features"].ColumnType = new VectorDataViewType(NumberDataViewType.Single, k);
+                    schemaLoadF[nameof(PcaOutputRowFloat.Label)].ColumnName = "Label";
+
+                    var outputDataF = mlContext.Data.LoadFromEnumerable(resultF, schemaLoadF);
 
                     var pcaNamesF = Enumerable.Range(1, k)
                         .Select(i => $"PCA_Component_{i}")
@@ -151,7 +155,11 @@ namespace D2G.Iris.ML.FeatureEngineering
                         schemaDefinition: schemaOutL)
                         .ToList();
 
-                    var outputDataL = mlContext.Data.LoadFromEnumerable(resultL);
+                    var schemaLoadL = SchemaDefinition.Create(typeof(PcaOutputRowLong));
+                    schemaLoadL["Features"].ColumnType = new VectorDataViewType(NumberDataViewType.Single, k);
+                    schemaLoadL[nameof(PcaOutputRowLong.Label)].ColumnName = "Label";
+
+                    var outputDataL = mlContext.Data.LoadFromEnumerable(resultL, schemaLoadL);
 
                     var pcaNamesL = Enumerable.Range(1, k)
                         .Select(i => $"PCA_Component_{i}")

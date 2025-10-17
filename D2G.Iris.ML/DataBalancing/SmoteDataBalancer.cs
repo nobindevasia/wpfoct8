@@ -145,7 +145,13 @@ namespace D2G.Iris.ML.DataBalancing
                     Label = 1
                 }));
 
-                var balancedData = mlContext.Data.LoadFromEnumerable(balancedFeatures);
+                // Create schema definition with fixed vector size to avoid VarVector
+                int featureCount = featureNames.Length;
+                var schemaDefinition = SchemaDefinition.Create(typeof(FeatureVector));
+                schemaDefinition[nameof(FeatureVector.Features)].ColumnType =
+                    new VectorDataViewType(NumberDataViewType.Single, featureCount);
+
+                var balancedData = mlContext.Data.LoadFromEnumerable(balancedFeatures, schemaDefinition);
 
                 stopwatch.Stop();
                 long elapsedMs = stopwatch.ElapsedMilliseconds;

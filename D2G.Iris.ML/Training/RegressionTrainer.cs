@@ -268,8 +268,20 @@ namespace D2G.Iris.ML.Training
                 config.ModelType,
                 config.TrainingParameters);
 
-            var pipeline = GetBasePipeline(_mlContext)
-                .Append(trainer);
+            // Only normalize if Features column doesn't already exist (i.e., not from PCA)
+            // PCA already normalizes data internally
+            IEstimator<ITransformer> pipeline;
+            if (split.TrainSet.Schema.GetColumnOrNull("Features").HasValue)
+            {
+                // Features already exists and normalized (e.g., from PCA), skip normalization
+                pipeline = trainer;
+            }
+            else
+            {
+                // Features doesn't exist or isn't normalized, apply normalization
+                pipeline = GetBasePipeline(_mlContext)
+                    .Append(trainer);
+            }
 
             var trainingStartTime = DateTime.Now;
             var model = await TrainModelAsync(pipeline, split.TrainSet);
@@ -303,32 +315,18 @@ namespace D2G.Iris.ML.Training
 
         private IDataView PrepareData(IDataView dataView, string[] featureNames)
         {
-            try
+            if (dataView.Schema.GetColumnOrNull("Features").HasValue)
             {
-                if (dataView.Schema.GetColumnOrNull("Features").HasValue)
-                {
-                    var dataPoints = _mlContext.Data
-                        .CreateEnumerable<RegressionDataPoint>(dataView, reuseRowObject: false)
-                        .ToList();
-
-                    var schemaDef = SchemaDefinition.Create(typeof(RegressionDataPoint));
-                    schemaDef[nameof(RegressionDataPoint.Features)].ColumnType = new VectorDataViewType(
-                        NumberDataViewType.Single,
-                        featureNames.Length);
-
-                    return _mlContext.Data.LoadFromEnumerable(dataPoints, schemaDef);
-                }
-                else
-                {
-                    var featuresPipeline = _mlContext.Transforms.Concatenate("Features", featureNames);
-                    return featuresPipeline.Fit(dataView).Transform(dataView);
-                }
+                // Features column already exists, just return the data as-is
+                // No need to materialize - keep it as IDataView for lazy evaluation
+                return dataView;
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine($"Error preparing data: {ex.Message}");
-                Console.WriteLine($"Available columns: {string.Join(", ", dataView.Schema.Select(c => c.Name))}");
-                throw;
+                // Features column doesn't exist, create it by concatenating feature columns
+                return _mlContext.Transforms.Concatenate("Features", featureNames)
+                    .Fit(dataView)
+                    .Transform(dataView);
             }
         }
     }

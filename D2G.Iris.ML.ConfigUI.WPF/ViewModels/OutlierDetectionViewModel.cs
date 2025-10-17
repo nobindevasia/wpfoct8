@@ -488,7 +488,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 if (!string.IsNullOrEmpty(_cleanedTableName))
                 {
-                    _dialogService.ShowInfoDialog($"Winsorization completed for {selectedColumns.Count} columns using database view approach.", "Winsorization Complete");
+                    _dialogService.ShowInfoDialog($"Winsorization completed for {selectedColumns.Count} columns.", "Winsorization Complete");
 
                     OutlierResults.Clear();
                     foreach (var summary in SummaryResults.Where(s => selectedColumns.Contains(s.ColumnName)))
@@ -1109,9 +1109,9 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     WinsorizationProgressPercentage = stepProgress;
 
                     Console.WriteLine($"[{currentColumn}/{totalColumns}] ({stepProgress}%) Processing column: {column}");
-                    CurrentColumnBeingProcessed = column;
+                    CurrentColumnBeingProcessed = "";  // Don't show column name redundantly
                     CurrentStepDescription = $"Calculating percentiles for {column}";
-                    WinsorizationProgress = $"Processing column {column} ({currentColumn} of {totalColumns})";
+                    WinsorizationProgress = $"Processing percentiles ({currentColumn} of {totalColumns})";
 
                     var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
                     var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
@@ -1123,7 +1123,7 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     {
                         countCommand.CommandTimeout = 60;
                         var validCount = Convert.ToInt64(countCommand.ExecuteScalar());
-                        Console.WriteLine($"  → Found {validCount:N0} valid numeric values in column {column}");
+                        Console.WriteLine($"  Found {validCount:N0} valid numeric values in column {column}");
                     }
 
                     CurrentStepDescription = $"Computing percentiles for {column}";
@@ -1144,17 +1144,17 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         var upperBound = Convert.ToDecimal(reader["UpperBound"]);
                         percentileCalculations[column] = (lowerBound, upperBound);
 
-                        Console.WriteLine($"  → Percentiles: {WinsorLowerPercentile}% = {lowerBound:F4}, {WinsorUpperPercentile}% = {upperBound:F4}");
-                        Console.WriteLine($"  ✓ Column {column} percentiles calculated successfully");
-                        CurrentStepDescription = $"✓ Completed {column} - Lower: {lowerBound:F4}, Upper: {upperBound:F4}";
+                        Console.WriteLine($"  Percentiles: {WinsorLowerPercentile}% = {lowerBound:F4}, {WinsorUpperPercentile}% = {upperBound:F4}");
+                        Console.WriteLine($"  Column {column} percentiles calculated successfully");
+                        CurrentStepDescription = $"Completed {column} - Lower: {lowerBound:F4}, Upper: {upperBound:F4}";
 
                         // Brief pause to show the progress
                         await Task.Delay(100);
                     }
                     else
                     {
-                        Console.WriteLine($"  ⚠️ Warning: No data found for column {column}");
-                        CurrentStepDescription = $"⚠️ No data found for {column}";
+                        Console.WriteLine($"Warning: No data found for column {column}");
+                        CurrentStepDescription = $"No data found for {column}";
                     }
                 }
 
@@ -1167,18 +1167,31 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 // Get ALL columns from the table (not just _columns) to ensure ReportDateTime and other columns are included
                 var allTableColumns = new List<string>();
 
-                // Parse schema and table name
+                // Parse schema and table name - remove brackets first
                 string schemaName = "dbo";
                 string actualTableName = _tableName;
-                if (_tableName.Contains('.'))
+
+                // Remove brackets and parse
+                var cleanedTableName = _tableName.Replace("[", "").Replace("]", "");
+                if (cleanedTableName.Contains('.'))
                 {
-                    var parts = _tableName.Split('.');
+                    var parts = cleanedTableName.Split('.');
                     if (parts.Length == 2)
                     {
                         schemaName = parts[0];
                         actualTableName = parts[1];
                     }
+                    else if (parts.Length == 1)
+                    {
+                        actualTableName = parts[0];
+                    }
                 }
+                else
+                {
+                    actualTableName = cleanedTableName;
+                }
+
+                Console.WriteLine($"Querying INFORMATION_SCHEMA for schema='{schemaName}', table='{actualTableName}'");
 
                 var schemaQuery = $@"
                     SELECT COLUMN_NAME
@@ -1239,7 +1252,7 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
 
                 await Task.Delay(500); // Brief pause to show completion
                 WinsorizationProgressPercentage = 100;
-                CurrentStepDescription = "✓ Winsorization completed successfully";
+                CurrentStepDescription = "Winsorization completed successfully";
 
                 return viewName;
             }
@@ -1289,11 +1302,11 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 var dropViewSql = $"DROP VIEW IF EXISTS {_cleanedTableName}";
                 using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand(dropViewSql, connection);
                 dropCommand.ExecuteNonQuery();
-                Console.WriteLine($"✓ Cleaned up view: {_cleanedTableName}");
+                Console.WriteLine($"Cleaned up view: {_cleanedTableName}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Warning: Could not clean up view {_cleanedTableName}: {ex.Message}");
+                Console.WriteLine($"Warning: Could not clean up view {_cleanedTableName}: {ex.Message}");
                 // Don't throw - cleanup failure shouldn't break the application
             }
         }

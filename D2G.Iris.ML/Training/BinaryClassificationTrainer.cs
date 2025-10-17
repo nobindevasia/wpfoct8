@@ -256,9 +256,22 @@ namespace D2G.Iris.ML.Training
                 }
             }
 
-            var pipeline = GetBasePipeline(mlContext)
-                .Append(trainer)
-                .Append(mlContext.Transforms.CopyColumns("Probability", "Score"));
+            // Only normalize if Features column doesn't already exist (i.e., not from PCA)
+            // PCA already normalizes data internally
+            IEstimator<ITransformer> pipeline;
+            if (split.TrainSet.Schema.GetColumnOrNull("Features").HasValue)
+            {
+                // Features already exists and normalized (e.g., from PCA), skip normalization
+                pipeline = trainer
+                    .Append(mlContext.Transforms.CopyColumns("Probability", "Score"));
+            }
+            else
+            {
+                // Features doesn't exist or isn't normalized, apply normalization
+                pipeline = GetBasePipeline(mlContext)
+                    .Append(trainer)
+                    .Append(mlContext.Transforms.CopyColumns("Probability", "Score"));
+            }
 
             var trainingStartTime = DateTime.Now;
             var model = await TrainModelAsync(pipeline, split.TrainSet);
@@ -302,22 +315,13 @@ namespace D2G.Iris.ML.Training
         {
             if (labeledData.Schema.GetColumnOrNull("Features").HasValue)
             {
-                var temp = labeledData.GetColumn<VBuffer<float>>("Features")
-                    .Zip(labeledData.GetColumn<bool>("Label"), (feat, lbl) => new BinaryVector
-                    {
-                        Features = feat.GetValues().ToArray(),
-                        Label = lbl
-                    })
-                    .ToList();
-
-                var schemaDef = SchemaDefinition.Create(typeof(BinaryVector));
-                schemaDef[nameof(BinaryVector.Features)].ColumnType =
-                    new VectorDataViewType(NumberDataViewType.Single, featureNames.Length);
-
-                return _mlContext.Data.LoadFromEnumerable(temp, schemaDef);
+                // Features column already exists, just return the data as-is
+                // No need to materialize - keep it as IDataView for lazy evaluation
+                return labeledData;
             }
             else
             {
+                // Features column doesn't exist, create it by concatenating feature columns
                 return _mlContext.Transforms.Concatenate("Features", featureNames)
                     .Fit(labeledData)
                     .Transform(labeledData);

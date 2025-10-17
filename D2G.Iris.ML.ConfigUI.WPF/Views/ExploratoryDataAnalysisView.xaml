@@ -184,6 +184,10 @@
                 <views:ScatterPlotView DataContext="{Binding ScatterPlotViewModel}"/>
             </TabItem>
 
+            <TabItem Header="Violin Plots">
+                <views:ViolinPlotView DataContext="{Binding ViolinPlotViewModel}"/>
+            </TabItem>
+
             <TabItem Header="Correlation Heatmap">
                 <Grid>
                     <Grid.RowDefinitions>

@@ -42,7 +42,12 @@
       "Bash(dir \"C:\\Users\\n.devasia\\Desktop\\Code\\Latest\\D2G.Iris.ML.ConfigUI.WPF\\obj\\Debug\\net8.0-windows\\Views\\AutoMLSettingsView.g.i.cs\")",
       "Bash(dotnet run)",
       "Bash(Get-Content \"C:\\Users\\n.devasia\\Desktop\\Code\\Latest\\D2G.Iris.ML.ConfigUI.WPF\\Views\\AutoMLSettingsView.xaml\")",
-      "Bash(Select-String -Pattern \"Grid.Row=\" -Context 0,1)"
+      "Bash(Select-String -Pattern \"Grid.Row=\" -Context 0,1)",
+      "Bash(Select-String \"error CS\" -Context 0,1)",
+      "Bash(Select-String \"error|warning\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(timeout 30 bash:*)",
+      "Bash(dotnet add:*)"
     ],
     "deny": [],
     "ask": []

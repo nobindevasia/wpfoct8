@@ -154,11 +154,25 @@ namespace D2G.Iris.ML.Training
                 preparedData,
                 config.TrainingParameters.TestFraction);
 
-            IEstimator<ITransformer> pipeline = mlContext.Transforms
-                .NormalizeMinMax("Features")
-                .Append(mlContext.Transforms.Conversion
-                    .MapValueToKey(outputColumnName: "Label", inputColumnName: "Label"))
-                .AppendCacheCheckpoint(mlContext);
+            // Only normalize if Features column doesn't already exist (i.e., not from PCA)
+            // PCA already normalizes data internally
+            IEstimator<ITransformer> pipeline;
+            if (splitData.TrainSet.Schema.GetColumnOrNull("Features").HasValue)
+            {
+                // Features already exists and normalized (e.g., from PCA), skip normalization
+                pipeline = mlContext.Transforms.Conversion
+                    .MapValueToKey(outputColumnName: "Label", inputColumnName: "Label")
+                    .AppendCacheCheckpoint(mlContext);
+            }
+            else
+            {
+                // Features doesn't exist or isn't normalized, apply normalization
+                pipeline = mlContext.Transforms
+                    .NormalizeMinMax("Features")
+                    .Append(mlContext.Transforms.Conversion
+                        .MapValueToKey(outputColumnName: "Label", inputColumnName: "Label"))
+                    .AppendCacheCheckpoint(mlContext);
+            }
 
             var trainer = _trainerFactory.GetTrainer(
                 config.ModelType,
@@ -244,20 +258,19 @@ namespace D2G.Iris.ML.Training
 
         private IDataView PrepareData(IDataView dataView, string[] featureNames)
         {
-            var data = _mlContext.Data
-                .CreateEnumerable<ModelInput>(dataView, reuseRowObject: false)
-                .Select(row => new ModelInput
-                {
-                    Features = row.Features,
-                    Label = row.Label
-                })
-                .ToList();
-
-            var schema = SchemaDefinition.Create(typeof(ModelInput));
-            schema["Features"].ColumnType =
-                new VectorDataViewType(NumberDataViewType.Single, featureNames.Length);
-
-            return _mlContext.Data.LoadFromEnumerable(data, schema);
+            if (dataView.Schema.GetColumnOrNull("Features").HasValue)
+            {
+                // Features column already exists, just return the data as-is
+                // No need to materialize - keep it as IDataView for lazy evaluation
+                return dataView;
+            }
+            else
+            {
+                // Features column doesn't exist, create it by concatenating feature columns
+                return _mlContext.Transforms.Concatenate("Features", featureNames)
+                    .Fit(dataView)
+                    .Transform(dataView);
+            }
         }
 
         private void LimitTrainers(MulticlassExperimentSettings experimentSettings, int maxModels)

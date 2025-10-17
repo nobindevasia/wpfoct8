@@ -10,6 +10,7 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <converters:StringToDecimalConverter x:Key="StringToDecimalConverter"/>
+        <converters:StringToIntConverter x:Key="StringToIntConverter"/>
         
         
         <Style x:Key="SectionHeaderStyle" TargetType="TextBlock">
@@ -94,8 +95,8 @@
                         
                         <Label Grid.Row="2" Grid.Column="0" Content="K Neighbors:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" 
-                                 Text="{Binding DataBalancing.KNeighbors, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding DataBalancing.KNeighbors, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToIntConverter}}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
@@ -166,16 +167,16 @@
                         
                         <Label Grid.Row="2" Grid.Column="0" Content="Components:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding FeatureEngineering.IsPcaSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="2" Grid.Column="1" 
-                                 Text="{Binding FeatureEngineering.NumberOfComponents, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox Grid.Row="2" Grid.Column="1"
+                                 Text="{Binding FeatureEngineering.NumberOfComponents, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToIntConverter}}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding FeatureEngineering.IsPcaSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
                         
                         <Label Grid.Row="4" Grid.Column="0" Content="Max Features:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding FeatureEngineering.IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="4" Grid.Column="1" 
-                                 Text="{Binding FeatureEngineering.MaxFeatures, UpdateSourceTrigger=PropertyChanged}" 
+                        <TextBox Grid.Row="4" Grid.Column="1"
+                                 Text="{Binding FeatureEngineering.MaxFeatures, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToIntConverter}}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding FeatureEngineering.IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
@@ -240,7 +241,7 @@
                     <TextBox Grid.Column="2"
                              Text="{Binding IntermediateResultsSchema, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource CompactInputStyle}"
-                             ToolTip="Schema name (optional)"/>
+                             ToolTip="Schema name (e.g., dbo)"/>
                 </Grid>
 
                 <!-- Table Name -->

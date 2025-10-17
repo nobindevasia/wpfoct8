@@ -49,6 +49,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private VisualisationViewModel _visualisationViewModel;
         private OutlierDetectionViewModel _outlierDetectionViewModel;
         private ScatterPlotViewModel _scatterPlotViewModel;
+        private ViolinPlotViewModel _violinPlotViewModel;
         private UserControl? _correlationHeatmapChart;
 
         private DatasetSummary? _currentDatasetSummary;
@@ -67,6 +68,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _visualisationViewModel = new VisualisationViewModel(dialogService, _databaseAnalytics);
             _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService, _databaseAnalytics);
             _scatterPlotViewModel = new ScatterPlotViewModel(dialogService, _databaseAnalytics);
+            _violinPlotViewModel = new ViolinPlotViewModel(dialogService, _databaseAnalytics);
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
             GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
@@ -138,6 +140,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _scatterPlotViewModel;
             set => SetProperty(ref _scatterPlotViewModel, value);
+        }
+
+        public ViolinPlotViewModel ViolinPlotViewModel
+        {
+            get => _violinPlotViewModel;
+            set => SetProperty(ref _violinPlotViewModel, value);
         }
 
         public UserControl? CorrelationHeatmapChart
@@ -255,12 +263,20 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private async Task AnalyzeDataAsync()
         {
-            Console.WriteLine("=== Starting EDA Analysis ===");
+            var logPath = @"C:\Users\n.devasia\Desktop\eda_debug.log";
+            System.IO.File.AppendAllText(logPath, $"\n\n===========================================\n");
+            System.IO.File.AppendAllText(logPath, $"=== EDA: AnalyzeDataAsync CALLED at {DateTime.Now:HH:mm:ss.fff} ===\n");
+            System.IO.File.AppendAllText(logPath, $"===========================================\n");
+
+            Console.WriteLine("===========================================");
+            Console.WriteLine("=== EDA: AnalyzeDataAsync CALLED ===");
+            Console.WriteLine("===========================================");
             try
             {
                 IsLoading = true;
                 LoadingMessage = "Validating configuration...";
-                Console.WriteLine("✓ Starting data analysis");
+                System.IO.File.AppendAllText(logPath, "EDA: Set IsLoading = true\n");
+                Console.WriteLine("EDA: Set IsLoading = true");
 
                 var databaseConfig = _getDatabaseConfig?.Invoke();
                 var inputFields = _getInputFields?.Invoke();
@@ -350,32 +366,86 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Analyzing missing values...";
                 await Task.Delay(100);
 
-                Console.WriteLine("Getting missing values analysis...");
+                Console.WriteLine("EDA: Getting missing values analysis...");
                 try
                 {
                     var missingValuesInfo = await _databaseAnalytics.GetMissingValuesAnalysisAsync(
                         _connectionString, _tableName, _enabledColumns, _whereClause);
-                    Console.WriteLine("✓ Missing values analysis completed successfully");
+                    Console.WriteLine("EDA: ✓ Missing values analysis completed successfully");
 
                     await UpdateMissingValuesAsync(missingValuesInfo);
+                    Console.WriteLine("EDA: ✓ UpdateMissingValuesAsync completed");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"✗ Missing values analysis failed: {ex.GetType().Name} - {ex.Message}");
+                    Console.WriteLine($"EDA: ✗ Missing values analysis failed: {ex.GetType().Name} - {ex.Message}");
                     throw;
                 }
 
                 LoadingMessage = "Setting up visualization components...";
                 await Task.Delay(100);
 
+                System.IO.File.AppendAllText(logPath, "EDA: Setting up visualization view model\n");
+                Console.WriteLine("EDA: Setting up visualization view model");
                 _visualisationViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                System.IO.File.AppendAllText(logPath, "EDA: ✓ Visualization VM setup complete\n");
+                Console.WriteLine("EDA: ✓ Visualization VM setup complete");
 
                 LoadingMessage = "Setting up outlier detection...";
                 await Task.Delay(100);
 
+                System.IO.File.AppendAllText(logPath, "EDA: Setting up outlier detection view model\n");
+                Console.WriteLine("EDA: Setting up outlier detection view model");
                 _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
+                System.IO.File.AppendAllText(logPath, "EDA: ✓ Outlier detection VM setup complete\n");
+                Console.WriteLine("EDA: ✓ Outlier detection VM setup complete");
 
+                System.IO.File.AppendAllText(logPath, "EDA: Setting up scatter plot view model\n");
+                Console.WriteLine("EDA: Setting up scatter plot view model");
                 _scatterPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                System.IO.File.AppendAllText(logPath, "EDA: ✓ Scatter plot VM setup complete\n");
+                Console.WriteLine("EDA: ✓ Scatter plot VM setup complete");
+
+                System.IO.File.AppendAllText(logPath, "=== EDA: Setting up violin plot view model ===\n");
+                System.IO.File.AppendAllText(logPath, $"EDA: Parameters - ConnStr:{_connectionString?.Length ?? 0}, Table:'{_tableName}', Cols:{_enabledColumns?.Length ?? 0}\n");
+                System.IO.File.AppendAllText(logPath, $"EDA: _violinPlotViewModel == null? {_violinPlotViewModel == null}\n");
+
+                Console.WriteLine("=== EDA: Setting up violin plot view model ===");
+                Console.WriteLine($"EDA: Parameters - ConnStr:{_connectionString?.Length ?? 0}, Table:'{_tableName}', Cols:{_enabledColumns?.Length ?? 0}");
+                Console.WriteLine($"EDA: _violinPlotViewModel == null? {_violinPlotViewModel == null}");
+
+                if (_violinPlotViewModel == null)
+                {
+                    System.IO.File.AppendAllText(logPath, "EDA: ERROR - _violinPlotViewModel is NULL!\n");
+                    Console.WriteLine("EDA: ERROR - _violinPlotViewModel is NULL!");
+                }
+                else
+                {
+                    System.IO.File.AppendAllText(logPath, "EDA: About to AWAIT SetDatabaseConnection on violin plot VM\n");
+                    Console.WriteLine("EDA: About to AWAIT SetDatabaseConnection on violin plot VM");
+                    Console.WriteLine($"EDA: Will pass - ConnStr (length {_connectionString?.Length}), Table '{_tableName}', {_enabledColumns?.Length} columns, WhereClause '{_whereClause}'");
+
+                    try
+                    {
+                        await _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                        System.IO.File.AppendAllText(logPath, "EDA: SetDatabaseConnection COMPLETED successfully\n");
+                        System.IO.File.AppendAllText(logPath, $"EDA: ViolinPlot NumericColumns.Count = {_violinPlotViewModel.NumericColumns?.Count ?? 0}\n");
+                        Console.WriteLine("EDA: SetDatabaseConnection COMPLETED successfully");
+                        Console.WriteLine($"EDA: ViolinPlot NumericColumns.Count = {_violinPlotViewModel.NumericColumns?.Count ?? 0}");
+                    }
+                    catch (Exception violinEx)
+                    {
+                        System.IO.File.AppendAllText(logPath, $"EDA: EXCEPTION calling SetDatabaseConnection - {violinEx.GetType().Name}: {violinEx.Message}\n");
+                        System.IO.File.AppendAllText(logPath, $"EDA: Stack trace - {violinEx.StackTrace}\n");
+                        Console.WriteLine($"EDA: EXCEPTION calling SetDatabaseConnection - {violinEx.GetType().Name}: {violinEx.Message}");
+                        Console.WriteLine($"EDA: Stack trace - {violinEx.StackTrace}");
+                        if (violinEx.InnerException != null)
+                        {
+                            System.IO.File.AppendAllText(logPath, $"EDA: Inner exception - {violinEx.InnerException.GetType().Name}: {violinEx.InnerException.Message}\n");
+                            Console.WriteLine($"EDA: Inner exception - {violinEx.InnerException.GetType().Name}: {violinEx.InnerException.Message}");
+                        }
+                    }
+                }
 
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +
@@ -812,6 +882,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             _visualisationViewModel?.Dispose();
             _outlierDetectionViewModel?.Dispose();
+            _violinPlotViewModel?.Dispose();
             base.Dispose();
         }
     }

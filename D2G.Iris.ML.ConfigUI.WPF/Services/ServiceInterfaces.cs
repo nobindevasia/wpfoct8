@@ -57,6 +57,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
         Task<string> DebugHistogramStepsAsync(string connectionString, string tableName, string columnName, int binCount, string? whereClause = null);
         Task<string> DebugBasicOperationsAsync(string connectionString, string tableName, string? whereClause = null);
         Task<List<ScatterPlotPoint>> GetScatterPlotDataAsync(string connectionString, string tableName, string xColumn, string yColumn, int? maxPoints = null, string? whereClause = null);
+        Task<List<double>> GetDistributionDataAsync(string connectionString, string tableName, string columnName, string? whereClause = null, int maxSampleSize = 10000);
     }
 
     public enum OutlierDetectionMethod

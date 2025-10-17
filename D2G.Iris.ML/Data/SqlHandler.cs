@@ -299,7 +299,7 @@ namespace D2G.Iris.ML.Data
             {
                 insertCmd.CommandTimeout = 300;
                 var rowsAffected = insertCmd.ExecuteNonQuery();
-                Console.WriteLine($"Copied {rowsAffected:N0} rows using direct SQL INSERT (zero memory usage)");
+                Console.WriteLine($"Copied {rowsAffected:N0} rows");
             }
         }
     }

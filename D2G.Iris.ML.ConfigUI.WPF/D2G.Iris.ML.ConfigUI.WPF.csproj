@@ -16,6 +16,8 @@
 		<PackageReference Include="Microsoft.ML.OnnxConverter" Version="0.22.2" />
 		<PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.22.0" />
 		<PackageReference Include="Microsoft.ML.OnnxTransformer" Version="4.0.2" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.1901.177" />
+		<PackageReference Include="Plotly.NET" Version="4.2.0" />
 		<PackageReference Include="SciChart" Version="6.2.0.13254" />
 	</ItemGroup>
 

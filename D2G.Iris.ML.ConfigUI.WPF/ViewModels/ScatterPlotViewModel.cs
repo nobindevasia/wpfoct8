@@ -122,7 +122,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 var numericTypes = new[] { "int", "bigint", "smallint", "tinyint", "decimal", "numeric", "money", "smallmoney", "float", "real" };
 
                 var numericCols = schema
-                    .Where(s => numericTypes.Contains(s.DataType.ToLower()))
+                    .Where(s => numericTypes.Contains(s.DataType.ToLower()) &&
+                               (_columns == null || _columns.Contains(s.ColumnName)))
                     .Select(s => s.ColumnName)
                     .ToList();
 

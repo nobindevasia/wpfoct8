@@ -25,11 +25,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
-            await Dispatcher.InvokeAsync(async () =>
-            {
-                await EnsureWebViewAsync();
-                UpdatePlotHtml(_viewModel?.PlotHtml);
-            });
+            await EnsureWebViewAsync();
+            UpdatePlotHtml(_viewModel?.PlotHtml);
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -37,8 +34,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             if (_viewModel != null)
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-                _viewModel = null;
             }
+            // Don't set _viewModel to null or reset _webViewInitialized
+            // Keep the state so it works when returning to this view
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -70,38 +68,55 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             }
 
             var html = _viewModel?.PlotHtml;
-            _ = Dispatcher.InvokeAsync(async () =>
+
+            // Use BeginInvoke with high priority to ensure immediate update
+            Dispatcher.BeginInvoke(async () =>
             {
                 await EnsureWebViewAsync();
                 UpdatePlotHtml(html);
-            });
+            }, System.Windows.Threading.DispatcherPriority.Render);
         }
 
         private async Task EnsureWebViewAsync()
         {
-            if (_webViewInitialized)
+            if (_webViewInitialized && PlotWebView?.CoreWebView2 != null)
             {
                 return;
             }
 
-            await PlotWebView.EnsureCoreWebView2Async();
-            _webViewInitialized = true;
+            try
+            {
+                await PlotWebView.EnsureCoreWebView2Async();
+                _webViewInitialized = true;
+            }
+            catch
+            {
+                // Initialization failed, will retry next time
+                _webViewInitialized = false;
+            }
         }
 
         private void UpdatePlotHtml(string? htmlContent)
         {
-            if (!_webViewInitialized)
+            if (!_webViewInitialized || PlotWebView?.CoreWebView2 == null)
             {
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(htmlContent))
+            try
             {
-                PlotWebView.NavigateToString("<html><body style='font-family:Segoe UI, sans-serif;color:#666;padding:24px;'>Generate a violin plot to view results.</body></html>");
+                if (string.IsNullOrWhiteSpace(htmlContent))
+                {
+                    PlotWebView.NavigateToString("<html><body style='font-family:Segoe UI, sans-serif;color:#666;padding:24px;'>Generate a violin plot to view results.</body></html>");
+                }
+                else
+                {
+                    PlotWebView.NavigateToString(htmlContent);
+                }
             }
-            else
+            catch
             {
-                PlotWebView.NavigateToString(htmlContent);
+                // WebView2 might not be ready yet, ignore
             }
         }
     }

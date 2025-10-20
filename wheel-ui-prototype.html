@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Workflow Wheel UI - Prototype</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .workflow-steps {
+            display: flex;
+            gap: 10px;
+        }
+
+        .step {
+            padding: 10px 20px;
+            border-radius: 25px;
+            background: #f0f0f0;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .step.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .step:not(:last-child)::after {
+            content: '→';
+            position: absolute;
+            right: -15px;
+            color: #999;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            width: 200px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 45%;
+            transition: width 0.5s;
+        }
+
+        .progress-text {
+            text-align: center;
+            margin-top: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .wheel-container {
+            display: flex;
+            gap: 40px;
+            margin: 40px 0;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .wheel-section {
+            position: relative;
+            width: 450px;
+            height: 450px;
+        }
+
+        .wheel {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.5s;
+        }
+
+        .center-hub {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 180px;
+            height: 180px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .center-hub:hover {
+            transform: translate(-50%, -50%) scale(1.05);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .center-title {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .center-subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .segment {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            font-weight: 600;
+            text-align: center;
+            padding: 15px;
+        }
+
+        .segment:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 5;
+        }
+
+        .segment.active {
+            box-shadow: 0 0 0 4px #667eea;
+        }
+
+        .segment-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .segment-label {
+            font-size: 13px;
+        }
+
+        /* EDA Wheel Segments */
+        .eda .segment:nth-child(1) { /* Scatter Plot */
+            top: 0;
+            right: 80px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .eda .segment:nth-child(2) { /* Visualisation */
+            top: 80px;
+            right: 0;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .eda .segment:nth-child(3) { /* Violin Plot */
+            bottom: 80px;
+            right: 0;
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .eda .segment:nth-child(4) { /* General Stats */
+            bottom: 0;
+            right: 80px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .eda .segment:nth-child(5) { /* Outlier Detection */
+            bottom: 0;
+            left: 80px;
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            color: white;
+        }
+
+        .eda .segment:nth-child(6) { /* Data Quality */
+            bottom: 80px;
+            left: 0;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+
+        .eda .segment:nth-child(7) { /* Correlation */
+            top: 80px;
+            left: 0;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #333;
+        }
+
+        .eda .segment:nth-child(8) { /* Distribution */
+            top: 0;
+            left: 80px;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+            color: #333;
+        }
+
+        /* Processing Wheel Segments */
+        .processing .segment:nth-child(1) {
+            top: 0;
+            right: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(2) {
+            top: 80px;
+            right: 0;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(3) {
+            bottom: 80px;
+            right: 0;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(4) {
+            bottom: 0;
+            right: 80px;
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(5) {
+            bottom: 0;
+            left: 80px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(6) {
+            bottom: 80px;
+            left: 0;
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            color: white;
+        }
+
+        .processing .segment:nth-child(7) {
+            top: 80px;
+            left: 0;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+        }
+
+        .processing .segment:nth-child(8) {
+            top: 0;
+            left: 80px;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+            color: #333;
+        }
+
+        /* Training Wheel Segments */
+        .training .segment:nth-child(1) {
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .training .segment:nth-child(2) {
+            top: 120px;
+            right: 40px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+
+        .training .segment:nth-child(3) {
+            bottom: 120px;
+            right: 40px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .training .segment:nth-child(4) {
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+        }
+
+        .training .segment:nth-child(5) {
+            bottom: 120px;
+            left: 40px;
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+
+        .training .segment:nth-child(6) {
+            top: 120px;
+            left: 40px;
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            color: white;
+        }
+
+        .detail-panel {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            min-height: 200px;
+        }
+
+        .detail-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .detail-content {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #f0f0f0;
+        }
+
+        .wheel-label {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .active-indicator {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="workflow-steps">
+                <div class="step active" onclick="switchWheel('eda')">1. EDA</div>
+                <div class="step" onclick="switchWheel('processing')">2. Processing</div>
+                <div class="step" onclick="switchWheel('training')">3. Training</div>
+            </div>
+            <div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text">Overall Progress: <span id="progressText">45%</span></div>
+            </div>
+        </div>
+
+        <div class="wheel-container">
+            <!-- EDA Wheel -->
+            <div class="wheel-section" id="edaWheel" style="display: block;">
+                <div class="wheel eda">
+                    <div class="segment active" onclick="selectSegment('Scatter Plot', 'Interactive scatter plot visualization for exploring relationships between variables. Click to configure axes, colors, and filters.')">
+                        <div class="segment-icon">📊</div>
+                        <div class="segment-label">Scatter Plot</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Visualisation', 'General visualization dashboard with multiple chart types including histograms, box plots, and time series.')">
+                        <div class="segment-icon">📈</div>
+                        <div class="segment-label">Visualisation</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Violin Plot', 'Statistical visualization showing distribution and probability density. Ideal for comparing multiple groups.')">
+                        <div class="segment-icon">🎻</div>
+                        <div class="segment-label">Violin Plot</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('General Stats', 'Descriptive statistics including mean, median, standard deviation, quartiles, and data types.')">
+                        <div class="segment-icon">📋</div>
+                        <div class="segment-label">General Stats</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Outlier Detection', 'Identify and analyze outliers using IQR, Z-score, and isolation forest methods.')">
+                        <div class="segment-icon">🎯</div>
+                        <div class="segment-label">Outlier Detection</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Data Quality', 'Assess data quality metrics including completeness, uniqueness, consistency, and validity.')">
+                        <div class="segment-icon">✓</div>
+                        <div class="segment-label">Data Quality</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Correlation', 'Correlation matrix and heatmap showing relationships between numerical features.')">
+                        <div class="segment-icon">🔗</div>
+                        <div class="segment-label">Correlation</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Distribution', 'Analyze data distributions with histograms, density plots, and normality tests.')">
+                        <div class="segment-icon">📉</div>
+                        <div class="segment-label">Distribution</div>
+                    </div>
+
+                    <div class="center-hub" onclick="expandView()">
+                        <div class="center-title">EDA</div>
+                        <div class="center-subtitle">Exploratory Analysis</div>
+                        <div style="margin-top: 10px; font-size: 24px;">🔍</div>
+                    </div>
+                </div>
+                <div class="wheel-label">Step 1: Exploratory Data Analysis</div>
+            </div>
+
+            <!-- Processing Wheel -->
+            <div class="wheel-section" id="processingWheel" style="display: none;">
+                <div class="wheel processing">
+                    <div class="segment" onclick="selectSegment('Input Fields', 'Configure input features, data types, and feature selection for the pipeline.')">
+                        <div class="segment-icon">📝</div>
+                        <div class="segment-label">Input Fields</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Feature Engineering', 'Create new features through transformations, interactions, and domain knowledge.')">
+                        <div class="segment-icon">⚙️</div>
+                        <div class="segment-label">Feature Engineering</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Data Balancing', 'Handle imbalanced datasets using SMOTE, undersampling, or class weights.')">
+                        <div class="segment-icon">⚖️</div>
+                        <div class="segment-label">Data Balancing</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Pipeline Config', 'Configure the complete data processing pipeline with preprocessing steps.')">
+                        <div class="segment-icon">🔄</div>
+                        <div class="segment-label">Pipeline Config</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Missing Data', 'Handle missing values with imputation strategies or removal policies.')">
+                        <div class="segment-icon">🔧</div>
+                        <div class="segment-label">Missing Data</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Normalization', 'Scale and normalize features using standardization or min-max scaling.')">
+                        <div class="segment-icon">📏</div>
+                        <div class="segment-label">Normalization</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Encoding', 'Encode categorical variables using one-hot, label, or target encoding.')">
+                        <div class="segment-icon">🏷️</div>
+                        <div class="segment-label">Encoding</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Validation', 'Set up cross-validation strategy and train/test split configuration.')">
+                        <div class="segment-icon">✅</div>
+                        <div class="segment-label">Validation</div>
+                    </div>
+
+                    <div class="center-hub" onclick="expandView()">
+                        <div class="center-title">PROCESS</div>
+                        <div class="center-subtitle">Data Pipeline</div>
+                        <div style="margin-top: 10px; font-size: 24px;">⚡</div>
+                    </div>
+                </div>
+                <div class="wheel-label">Step 2: Data Processing Pipeline</div>
+            </div>
+
+            <!-- Training Wheel -->
+            <div class="wheel-section" id="trainingWheel" style="display: none;">
+                <div class="wheel training">
+                    <div class="segment" onclick="selectSegment('AutoML Settings', 'Configure AutoML parameters, search space, and optimization objectives.')">
+                        <div class="segment-icon">🤖</div>
+                        <div class="segment-label">AutoML Settings</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Model Selection', 'Choose algorithms and ensemble methods for training.')">
+                        <div class="segment-icon">🎯</div>
+                        <div class="segment-label">Model Selection</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Hyperparameters', 'Define hyperparameter ranges and tuning strategies.')">
+                        <div class="segment-icon">🎛️</div>
+                        <div class="segment-label">Hyperparameters</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Training Logs', 'Monitor training progress, metrics, and model performance in real-time.')">
+                        <div class="segment-icon">📊</div>
+                        <div class="segment-label">Training Logs</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Evaluation', 'Evaluate model performance with various metrics and visualizations.')">
+                        <div class="segment-icon">📈</div>
+                        <div class="segment-label">Evaluation</div>
+                    </div>
+                    <div class="segment" onclick="selectSegment('Export Model', 'Save and export trained models for deployment.')">
+                        <div class="segment-icon">💾</div>
+                        <div class="segment-label">Export Model</div>
+                    </div>
+
+                    <div class="center-hub" onclick="expandView()">
+                        <div class="center-title">TRAIN</div>
+                        <div class="center-subtitle">Model Training</div>
+                        <div style="margin-top: 10px; font-size: 24px;">🚀</div>
+                    </div>
+                </div>
+                <div class="wheel-label">Step 3: Model Training</div>
+            </div>
+        </div>
+
+        <div class="detail-panel">
+            <div class="detail-title" id="detailTitle">Scatter Plot</div>
+            <div class="detail-content" id="detailContent">
+                Interactive scatter plot visualization for exploring relationships between variables. Click to configure axes, colors, and filters.
+                <ul style="margin-top: 15px; padding-left: 20px;">
+                    <li>Select X and Y axis variables</li>
+                    <li>Color code by categorical variables</li>
+                    <li>Add trend lines and regression analysis</li>
+                    <li>Filter data points interactively</li>
+                    <li>Export high-resolution plots</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-secondary" onclick="previousStep()">← Previous</button>
+            <button class="btn btn-primary" onclick="nextStep()">Next Step →</button>
+            <button class="btn btn-secondary" onclick="exportConfig()">Export Config</button>
+            <button class="btn btn-secondary" onclick="showHelp()">Help</button>
+        </div>
+    </div>
+
+    <script>
+        let currentWheel = 'eda';
+        let currentSegment = 'Scatter Plot';
+
+        function switchWheel(wheel) {
+            // Hide all wheels
+            document.getElementById('edaWheel').style.display = 'none';
+            document.getElementById('processingWheel').style.display = 'none';
+            document.getElementById('trainingWheel').style.display = 'none';
+
+            // Show selected wheel
+            document.getElementById(wheel + 'Wheel').style.display = 'block';
+
+            // Update active step
+            const steps = document.querySelectorAll('.step');
+            steps.forEach(s => s.classList.remove('active'));
+
+            if (wheel === 'eda') steps[0].classList.add('active');
+            if (wheel === 'processing') steps[1].classList.add('active');
+            if (wheel === 'training') steps[2].classList.add('active');
+
+            currentWheel = wheel;
+
+            // Update progress
+            if (wheel === 'eda') updateProgress(45);
+            if (wheel === 'processing') updateProgress(70);
+            if (wheel === 'training') updateProgress(90);
+        }
+
+        function selectSegment(title, content) {
+            currentSegment = title;
+            document.getElementById('detailTitle').textContent = title;
+            document.getElementById('detailContent').innerHTML = content;
+
+            // Update active segment
+            const segments = document.querySelectorAll('.segment');
+            segments.forEach(s => s.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        function updateProgress(percent) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = percent + '%';
+        }
+
+        function expandView() {
+            alert('Expanding ' + currentWheel.toUpperCase() + ' view to full screen...\n\nThis would show a detailed dashboard for the current wheel.');
+        }
+
+        function nextStep() {
+            if (currentWheel === 'eda') {
+                switchWheel('processing');
+            } else if (currentWheel === 'processing') {
+                switchWheel('training');
+            } else {
+                alert('Training complete! Ready to deploy model.');
+            }
+        }
+
+        function previousStep() {
+            if (currentWheel === 'training') {
+                switchWheel('processing');
+            } else if (currentWheel === 'processing') {
+                switchWheel('eda');
+            } else {
+                alert('Already at the first step.');
+            }
+        }
+
+        function exportConfig() {
+            alert('Exporting current configuration...\n\nThis would save all settings and parameters to a JSON file.');
+        }
+
+        function showHelp() {
+            alert('ML Workflow Wheel UI Help\n\n' +
+                  '1. Click on wheel steps (1, 2, 3) to navigate between phases\n' +
+                  '2. Click on colored segments to view details\n' +
+                  '3. Click center hub to expand current view\n' +
+                  '4. Use Next/Previous buttons for guided workflow\n' +
+                  '5. Export config to save your settings');
+        }
+    </script>
+</body>
+</html>

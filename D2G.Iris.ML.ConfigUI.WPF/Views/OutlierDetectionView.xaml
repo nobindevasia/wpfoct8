@@ -138,7 +138,7 @@
 
             </Grid>
         </GroupBox>
-
+        
         <!-- Results Panel -->
         <GroupBox Grid.Row="1" Header="Outlier Detection Results" Margin="10,0,10,10">
             <TabControl>

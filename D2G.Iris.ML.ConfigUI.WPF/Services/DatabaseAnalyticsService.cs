@@ -63,7 +63,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return null;
         }
 
-        public async Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null)
+        public async Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null, bool includePercentiles = false)
         {
             var statistics = new List<ColumnStatistics>();
             using (var connection = new SqlConnection(connectionString))
@@ -79,9 +79,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     var parts = tableName.Split('.');
                     if (parts.Length == 2)
                     {
-                        schemaName = parts[0];
-                        actualTableName = parts[1];
+                        schemaName = parts[0].Trim('[', ']');
+                        actualTableName = parts[1].Trim('[', ']');
                     }
+                }
+                else
+                {
+                    actualTableName = tableName.Trim('[', ']');
                 }
 
                 var dataTypeQuery = $@"
@@ -105,12 +109,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 foreach (var columnName in columns)
                 {
-                    // Build WHERE clause for percentiles CTE
-                    var percentileWhereClause = string.IsNullOrWhiteSpace(whereClause)
-                        ? $" WHERE {columnName} IS NOT NULL"
-                        : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL";
+                    var hasDataType = dataTypes.TryGetValue(columnName, out var dataType);
+                    var shouldIncludePercentiles = includePercentiles && hasDataType && IsNumericSqlType(dataType);
 
-                    var query = $@"
+                    string query;
+                    if (shouldIncludePercentiles)
+                    {
+                        var percentileWhereClause = string.IsNullOrWhiteSpace(whereClause)
+                            ? $" WHERE {columnName} IS NOT NULL"
+                            : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL";
+
+                        query = $@"
                         WITH Percentiles AS (
                             SELECT DISTINCT
                                 PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY {columnName}) OVER () as Q1,
@@ -130,6 +139,20 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                             (SELECT Median FROM Percentiles) as Median,
                             (SELECT Q3 FROM Percentiles) as Q3
                         FROM {tableName}{whereCondition}";
+                    }
+                    else
+                    {
+                        query = $@"
+                        SELECT
+                            COUNT(*) as Count,
+                            COUNT({columnName}) as NonNullCount,
+                            AVG(CAST({columnName} AS FLOAT)) as Mean,
+                            MIN({columnName}) as Min,
+                            MAX({columnName}) as Max,
+                            STDEV({columnName}) as StdDev,
+                            VAR({columnName}) as Variance
+                        FROM {tableName}{whereCondition}";
+                    }
 
                     using (var command = new SqlCommand(query, connection))
                     {
@@ -138,6 +161,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                         {
                             if (await reader.ReadAsync())
                             {
+                                var q1 = 0d;
+                                var median = 0d;
+                                var q3 = 0d;
+
+                                if (shouldIncludePercentiles)
+                                {
+                                    q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7));
+                                    median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8));
+                                    q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9));
+                                }
+
                                 statistics.Add(new ColumnStatistics
                                 {
                                     ColumnName = columnName,
@@ -149,9 +183,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                                     Max = reader.IsDBNull(4) ? (double?)null : Convert.ToDouble(reader.GetValue(4)),
                                     StdDev = reader.IsDBNull(5) ? (double?)null : Convert.ToDouble(reader.GetValue(5)),
                                     Variance = reader.IsDBNull(6) ? (double?)null : Convert.ToDouble(reader.GetValue(6)),
-                                    Q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7)),
-                                    Median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8)),
-                                    Q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9))
+                                    Q1 = q1,
+                                    Median = median,
+                                    Q3 = q3
                                 });
                             }
                         }
@@ -714,9 +748,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     var parts = tableName.Split('.');
                     if (parts.Length == 2)
                     {
-                        schemaName = parts[0];
-                        actualTableName = parts[1];
+                        schemaName = parts[0].Trim('[', ']');
+                        actualTableName = parts[1].Trim('[', ']');
                     }
+                }
+                else
+                {
+                    actualTableName = tableName.Trim('[', ']');
                 }
 
                 var query = $@"
@@ -928,6 +966,38 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
 
             return distributionData;
+        }
+
+        private static bool IsNumericSqlType(string? dataType)
+        {
+            if (string.IsNullOrWhiteSpace(dataType))
+            {
+                return false;
+            }
+
+            switch (dataType.ToLowerInvariant())
+            {
+                case "bigint":
+                case "int":
+                case "smallint":
+                case "tinyint":
+                case "decimal":
+                case "numeric":
+                case "float":
+                case "real":
+                case "money":
+                case "smallmoney":
+                case "bit":
+                case "date":
+                case "datetime":
+                case "datetime2":
+                case "datetimeoffset":
+                case "smalldatetime":
+                case "time":
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 

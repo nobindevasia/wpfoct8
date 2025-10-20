@@ -92,14 +92,14 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
 
     #region Public API
 
-    public async Task SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? whereClause = null)
+    public void SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? whereClause = null)
     {
         _connectionString = connectionString;
         _tableName = tableName;
         _enabledColumns = columns;
         _whereClause = whereClause;
 
-        await LoadNumericColumnsAsync().ConfigureAwait(false);
+        LoadNumericColumnsAsync();
         PlotHtml = null;
     }
 
@@ -107,7 +107,7 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
 
     #region Data Loading
 
-    private async Task LoadNumericColumnsAsync()
+    private async void LoadNumericColumnsAsync()
     {
         if (string.IsNullOrWhiteSpace(_connectionString) || string.IsNullOrWhiteSpace(_tableName))
         {
@@ -241,7 +241,12 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
         }
 
         var stats = await _databaseAnalyticsService
-            .GetColumnStatisticsAsync(_connectionString, _tableName, new[] { SelectedColumn }, _whereClause)
+            .GetColumnStatisticsAsync(
+                _connectionString,
+                _tableName,
+                new[] { SelectedColumn },
+                _whereClause,
+                includePercentiles: true)
             .ConfigureAwait(false);
 
         return stats?.FirstOrDefault();

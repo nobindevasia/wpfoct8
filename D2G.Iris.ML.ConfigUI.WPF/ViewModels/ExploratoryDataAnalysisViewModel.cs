@@ -406,46 +406,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 System.IO.File.AppendAllText(logPath, "EDA: ✓ Scatter plot VM setup complete\n");
                 Console.WriteLine("EDA: ✓ Scatter plot VM setup complete");
 
-                System.IO.File.AppendAllText(logPath, "=== EDA: Setting up violin plot view model ===\n");
-                System.IO.File.AppendAllText(logPath, $"EDA: Parameters - ConnStr:{_connectionString?.Length ?? 0}, Table:'{_tableName}', Cols:{_enabledColumns?.Length ?? 0}\n");
-                System.IO.File.AppendAllText(logPath, $"EDA: _violinPlotViewModel == null? {_violinPlotViewModel == null}\n");
-
-                Console.WriteLine("=== EDA: Setting up violin plot view model ===");
-                Console.WriteLine($"EDA: Parameters - ConnStr:{_connectionString?.Length ?? 0}, Table:'{_tableName}', Cols:{_enabledColumns?.Length ?? 0}");
-                Console.WriteLine($"EDA: _violinPlotViewModel == null? {_violinPlotViewModel == null}");
-
-                if (_violinPlotViewModel == null)
-                {
-                    System.IO.File.AppendAllText(logPath, "EDA: ERROR - _violinPlotViewModel is NULL!\n");
-                    Console.WriteLine("EDA: ERROR - _violinPlotViewModel is NULL!");
-                }
-                else
-                {
-                    System.IO.File.AppendAllText(logPath, "EDA: About to AWAIT SetDatabaseConnection on violin plot VM\n");
-                    Console.WriteLine("EDA: About to AWAIT SetDatabaseConnection on violin plot VM");
-                    Console.WriteLine($"EDA: Will pass - ConnStr (length {_connectionString?.Length}), Table '{_tableName}', {_enabledColumns?.Length} columns, WhereClause '{_whereClause}'");
-
-                    try
-                    {
-                        await _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
-                        System.IO.File.AppendAllText(logPath, "EDA: SetDatabaseConnection COMPLETED successfully\n");
-                        System.IO.File.AppendAllText(logPath, $"EDA: ViolinPlot NumericColumns.Count = {_violinPlotViewModel.NumericColumns?.Count ?? 0}\n");
-                        Console.WriteLine("EDA: SetDatabaseConnection COMPLETED successfully");
-                        Console.WriteLine($"EDA: ViolinPlot NumericColumns.Count = {_violinPlotViewModel.NumericColumns?.Count ?? 0}");
-                    }
-                    catch (Exception violinEx)
-                    {
-                        System.IO.File.AppendAllText(logPath, $"EDA: EXCEPTION calling SetDatabaseConnection - {violinEx.GetType().Name}: {violinEx.Message}\n");
-                        System.IO.File.AppendAllText(logPath, $"EDA: Stack trace - {violinEx.StackTrace}\n");
-                        Console.WriteLine($"EDA: EXCEPTION calling SetDatabaseConnection - {violinEx.GetType().Name}: {violinEx.Message}");
-                        Console.WriteLine($"EDA: Stack trace - {violinEx.StackTrace}");
-                        if (violinEx.InnerException != null)
-                        {
-                            System.IO.File.AppendAllText(logPath, $"EDA: Inner exception - {violinEx.InnerException.GetType().Name}: {violinEx.InnerException.Message}\n");
-                            Console.WriteLine($"EDA: Inner exception - {violinEx.InnerException.GetType().Name}: {violinEx.InnerException.Message}");
-                        }
-                    }
-                }
+                System.IO.File.AppendAllText(logPath, "EDA: Setting up violin plot view model\n");
+                Console.WriteLine("EDA: Setting up violin plot view model");
+                _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                System.IO.File.AppendAllText(logPath, "EDA: ✓ Violin plot VM setup complete\n");
+                Console.WriteLine("EDA: ✓ Violin plot VM setup complete");
 
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +

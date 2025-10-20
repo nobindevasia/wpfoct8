@@ -382,7 +382,14 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         .Select(f => f.Name)
                         .ToArray();
 
-                    var mlContext = new Microsoft.ML.MLContext(seed: 42);
+                    // Use seed from AutoML config if provided, otherwise use default seed (42) or null for random
+                    int? mlContextSeed = config.AutoML?.Seed.HasValue == true
+                        ? (int)config.AutoML.Seed.Value
+                        : 42;
+
+                    var mlContext = new Microsoft.ML.MLContext(seed: mlContextSeed);
+                    TrainingLogs.LogMessage($"ML Context initialized with seed: {mlContextSeed?.ToString() ?? "random"}", "Info");
+
                     Microsoft.ML.IDataView rawData;
 
                     TrainingLogs.LogMessage("=============== Loading Data ===============", "Info");

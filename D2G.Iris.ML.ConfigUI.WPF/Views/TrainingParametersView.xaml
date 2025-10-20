@@ -304,6 +304,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="15"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="150"/>
@@ -347,6 +349,14 @@
                                      VerticalAlignment="Center" Height="25" Width="80"
                                      IsEnabled="{Binding UseCrossValidation}"/>
                             <Label Content="folds (2-10)" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                        </StackPanel>
+
+                        <!-- Random Seed -->
+                        <Label Grid.Row="10" Grid.Column="0" Content="Random Seed:" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal">
+                            <TextBox Text="{Binding AutoMLSeed, UpdateSourceTrigger=PropertyChanged}"
+                                     VerticalAlignment="Center" Height="25" Width="120"/>
+                            <Label Content="(optional, for reproducibility)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray" FontSize="11"/>
                         </StackPanel>
                     </Grid>
                 </GroupBox>

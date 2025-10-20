@@ -27,6 +27,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string _optimizingMetric = "Accuracy";
         private bool _useCrossValidation = false;
         private int _numberOfFolds = 5;
+        private string? _autoMLSeed = string.Empty;
 
 
         private ModelType _modelType = ModelType.BinaryClassification;
@@ -127,6 +128,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _numberOfFolds;
             set => SetProperty(ref _numberOfFolds, Math.Max(2, Math.Min(10, value)));
+        }
+
+        public string? AutoMLSeed
+        {
+            get => _autoMLSeed;
+            set => SetProperty(ref _autoMLSeed, value);
         }
 
         public ObservableCollection<string> AvailableMetrics { get; } = new();
@@ -326,6 +333,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 OptimizingMetric = autoMLConfig.OptimizingMetric ?? "Accuracy";
                 UseCrossValidation = autoMLConfig.UseCrossValidation;
                 NumberOfFolds = autoMLConfig.NumberOfFolds;
+                AutoMLSeed = autoMLConfig.Seed?.ToString() ?? string.Empty;
             }
             else
             {
@@ -335,6 +343,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 OptimizingMetric = "Accuracy";
                 UseCrossValidation = false;
                 NumberOfFolds = 5;
+                AutoMLSeed = string.Empty;
             }
 
             if (parameters == null) return;
@@ -390,6 +399,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 AlgorithmParameters = algorithmParameters
             };
 
+            // Parse seed value - if empty or invalid, set to null for random seed
+            uint? seedValue = null;
+            if (!string.IsNullOrWhiteSpace(AutoMLSeed) && uint.TryParse(AutoMLSeed, out uint parsedSeed))
+            {
+                seedValue = parsedSeed;
+            }
+
             var autoMLConfig = new AutoMLConfig
             {
                 Enabled = UseAutoML,
@@ -397,7 +413,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 MaxModels = MaxModelsToTry,
                 OptimizingMetric = OptimizingMetric,
                 UseCrossValidation = UseCrossValidation,
-                NumberOfFolds = NumberOfFolds
+                NumberOfFolds = NumberOfFolds,
+                Seed = seedValue
             };
 
             return (trainingParams, autoMLConfig, ModelType, TargetField);

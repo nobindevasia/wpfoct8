@@ -11,5 +11,6 @@ namespace D2G.Iris.ML.Core.Models
         public string OptimizingMetric { get; set; }
         public bool UseCrossValidation { get; set; }
         public int NumberOfFolds { get; set; } = 5;
+        public uint? Seed { get; set; } = null;  // Nullable - if not set, AutoML will use random seed
     }
 }

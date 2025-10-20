@@ -414,15 +414,21 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 System.IO.File.AppendAllText(logPath, "EDA: ✓ Scatter plot VM setup complete\n");
                 Console.WriteLine("EDA: ✓ Scatter plot VM setup complete");
 
+                // For ViolinPlot and BoxPlot, exclude target variable from columns list
+                // These are univariate analysis tools and don't need the target
+                var columnsWithoutTarget = string.IsNullOrEmpty(targetField)
+                    ? _enabledColumns
+                    : _enabledColumns.Where(col => !string.Equals(col, targetField, StringComparison.OrdinalIgnoreCase)).ToArray();
+
                 System.IO.File.AppendAllText(logPath, "EDA: Setting up violin plot view model\n");
                 Console.WriteLine("EDA: Setting up violin plot view model");
-                _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 System.IO.File.AppendAllText(logPath, "EDA: ✓ Violin plot VM setup complete\n");
                 Console.WriteLine("EDA: ✓ Violin plot VM setup complete");
 
                 System.IO.File.AppendAllText(logPath, "EDA: Setting up box plot view model\n");
                 Console.WriteLine("EDA: Setting up box plot view model");
-                _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 System.IO.File.AppendAllText(logPath, "EDA: ✓ Box plot VM setup complete\n");
                 Console.WriteLine("EDA: ✓ Box plot VM setup complete");
 

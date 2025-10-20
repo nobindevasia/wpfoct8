@@ -17,6 +17,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string _optimizingMetric = "Accuracy";
         private bool _useCrossValidation = false;
         private int _numberOfFolds = 5;
+        private string? _seed = string.Empty;  // Empty string means no seed (random)
         private string _description = "AutoML is disabled. Traditional training will be used with the algorithm specified in Training Parameters.";
 
         public AutoMLSettingsViewModel()
@@ -69,6 +70,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _numberOfFolds, System.Math.Max(2, System.Math.Min(10, value)));
         }
 
+        public string? Seed
+        {
+            get => _seed;
+            set => SetProperty(ref _seed, value);
+        }
+
         public string Description
         {
             get => _description;
@@ -94,6 +101,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 OptimizingMetric = "Accuracy";
                 UseCrossValidation = false;
                 NumberOfFolds = 5;
+                Seed = string.Empty;
                 return;
             }
             IsEnabled = config.Enabled;
@@ -102,10 +110,18 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             OptimizingMetric = config.OptimizingMetric ?? "Accuracy";
             UseCrossValidation = config.UseCrossValidation;
             NumberOfFolds = config.NumberOfFolds;
+            Seed = config.Seed?.ToString() ?? string.Empty;
         }
 
         public AutoMLConfig GetConfiguration()
         {
+            // Parse seed value - if empty or invalid, set to null for random seed
+            uint? seedValue = null;
+            if (!string.IsNullOrWhiteSpace(Seed) && uint.TryParse(Seed, out uint parsedSeed))
+            {
+                seedValue = parsedSeed;
+            }
+
             return new AutoMLConfig
             {
                 Enabled = IsEnabled,
@@ -113,7 +129,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 MaxModels = MaxModelsToTry,
                 OptimizingMetric = OptimizingMetric,
                 UseCrossValidation = UseCrossValidation,
-                NumberOfFolds = NumberOfFolds
+                NumberOfFolds = NumberOfFolds,
+                Seed = seedValue
             };
         }
 

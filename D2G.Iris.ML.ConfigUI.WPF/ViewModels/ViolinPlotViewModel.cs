@@ -199,7 +199,7 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
             ProgressMessage = $"Loading statistics for '{SelectedColumn}'...";
             PlotHtml = null;
 
-            var stats = await LoadColumnStatisticsAsync().ConfigureAwait(false);
+            var stats = await LoadColumnStatisticsAsync();
             if (stats == null || stats.NonNullCount == 0)
             {
                 await ShowInfoAsync("No data was returned for the selected column.", "No Data");
@@ -207,7 +207,7 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
             }
 
             ProgressMessage = "Fetching sample data...";
-            var distributionData = await LoadDistributionDataAsync().ConfigureAwait(false);
+            var distributionData = await LoadDistributionDataAsync();
             if (distributionData == null || distributionData.Count == 0)
             {
                 await ShowInfoAsync("Unable to build the plot because no sample data points were retrieved.", "No Data");

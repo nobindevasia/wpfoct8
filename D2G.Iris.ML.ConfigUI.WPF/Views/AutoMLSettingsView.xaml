@@ -22,6 +22,8 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="15"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
@@ -86,8 +88,19 @@
                        IsEnabled="{Binding UseCrossValidation}"/>
             </StackPanel>
 
+            <!-- Seed Setting -->
+            <Label Grid.Row="12" Grid.Column="0" Content="Random Seed:" VerticalAlignment="Center"
+                   IsEnabled="{Binding IsEnabled}"/>
+            <StackPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding Seed, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25" Width="120"
+                         IsEnabled="{Binding IsEnabled}"/>
+                <Label Content="(optional, for reproducibility)" VerticalAlignment="Center" Margin="5,0,0,0"
+                       IsEnabled="{Binding IsEnabled}" Foreground="Gray" FontSize="11"/>
+            </StackPanel>
 
-            <TextBlock Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="3"
+            <!-- Description -->
+            <TextBlock Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="3"
                        Text="{Binding Description}"
                        TextWrapping="Wrap"
                        Foreground="DarkBlue"

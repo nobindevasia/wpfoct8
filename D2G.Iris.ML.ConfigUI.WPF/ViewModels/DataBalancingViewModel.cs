@@ -31,7 +31,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 {
                     UpdateDescription();
                     OnPropertyChanged(nameof(IsSmoteSelected));
-                    OnPropertyChanged(nameof(IsEnabled)); 
+                    OnPropertyChanged(nameof(IsEnabled));
                 }
             }
         }

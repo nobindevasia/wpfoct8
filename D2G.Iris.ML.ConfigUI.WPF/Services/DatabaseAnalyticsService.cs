@@ -40,7 +40,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
@@ -97,7 +97,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var dataTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 using (var command = new SqlCommand(dataTypeQuery, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -156,7 +156,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                     using (var command = new SqlCommand(query, connection))
                     {
-                        command.CommandTimeout = 300; // 5 minutes timeout
+                        command.CommandTimeout = 300;
                         using (var reader = await command.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
@@ -211,7 +211,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
@@ -261,7 +261,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var histogram = new List<HistogramBin>();
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -299,7 +299,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var frequencies = new List<CategoryFrequency>();
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -336,7 +336,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var results = new List<ColumnNullInfo>();
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
@@ -380,7 +380,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     var result = await command.ExecuteScalarAsync();
                     return result != DBNull.Value ? Convert.ToDouble(result) : 0;
                 }
@@ -399,7 +399,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     var result = await command.ExecuteScalarAsync();
                     return Convert.ToInt32(result);
                 }
@@ -425,7 +425,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
@@ -479,7 +479,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 long totalRows;
                 using (var command = new SqlCommand(countQuery, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     totalRows = (int)await command.ExecuteScalarAsync();
                 }
 
@@ -494,7 +494,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                     using (var command = new SqlCommand(nullCountQuery, connection))
                     {
-                        command.CommandTimeout = 300; // 5 minutes timeout
+                        command.CommandTimeout = 300;
                         using (var reader = await command.ExecuteReaderAsync())
                         {
                             if (await reader.ReadAsync())
@@ -568,7 +568,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                             using (var command = new SqlCommand(query, connection))
                             {
-                                command.CommandTimeout = 300; // 5 minutes timeout
+                                command.CommandTimeout = 300;
                                 var result = await command.ExecuteScalarAsync();
                                 var correlation = result != DBNull.Value && result != null ? Convert.ToDouble(result) : 0;
                                 correlationMatrix.Values[i, j] = correlation;
@@ -713,7 +713,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -769,7 +769,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -820,7 +820,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var histogram = new List<HistogramBin>();
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -859,7 +859,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var frequencies = new List<CategoryFrequency>();
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -916,7 +916,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -946,7 +946,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     ? $" WHERE {nullCheckCondition}"
                     : $" WHERE ({whereClause}) AND {nullCheckCondition}";
 
-                // Use TABLESAMPLE or TOP with random sampling for large datasets
                 var query = $@"
                     SELECT TOP {maxSampleSize} CAST({columnName} AS FLOAT) as Value
                     FROM {tableName}{fullWhereClause}
@@ -954,7 +953,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 using (var command = new SqlCommand(query, connection))
                 {
-                    command.CommandTimeout = 300; // 5 minutes timeout
+                    command.CommandTimeout = 300;
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())

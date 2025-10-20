@@ -194,7 +194,7 @@ namespace D2G.Iris.ML.Data
                 config.ModelType,
                 config.TargetField,
                 config.FeatureEngineering);
-                    
+
             Console.WriteLine(result.report);
             return result;
         }

@@ -46,9 +46,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Commands
             }
             catch (Exception ex)
             {
-                
+
                 System.Diagnostics.Debug.WriteLine($"AsyncRelayCommand exception: {ex}");
-                
+
                 throw;
             }
             finally

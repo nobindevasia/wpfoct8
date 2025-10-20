@@ -33,7 +33,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                 var query = @"
                     SELECT COLUMN_NAME
-                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_NAME = @TableName
                     AND (@SchemaName IS NULL OR TABLE_SCHEMA = @SchemaName)
                     ORDER BY ORDINAL_POSITION";
@@ -92,9 +92,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 connection.Open();
 
                 var query = @"
-                    SELECT name 
-                    FROM sys.databases 
-                    WHERE state = 0 
+                    SELECT name
+                    FROM sys.databases
+                    WHERE state = 0
                     AND name NOT IN ('master', 'tempdb', 'model', 'msdb')
                     ORDER BY name";
 
@@ -125,11 +125,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 connection.Open();
 
                 var query = @"
-                    SELECT 
+                    SELECT
                         TABLE_SCHEMA,
                         TABLE_NAME,
                         TABLE_TYPE
-                    FROM INFORMATION_SCHEMA.TABLES 
+                    FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_TYPE IN ('BASE TABLE', 'VIEW')
                     ORDER BY TABLE_SCHEMA, TABLE_NAME";
 
@@ -168,7 +168,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 var (schemaName, table) = ParseTableName(tableName);
 
                 var query = @"
-                    SELECT 
+                    SELECT
                         COLUMN_NAME,
                         DATA_TYPE,
                         IS_NULLABLE,
@@ -176,7 +176,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                         NUMERIC_PRECISION,
                         NUMERIC_SCALE,
                         ORDINAL_POSITION
-                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_NAME = @TableName
                     AND (@SchemaName IS NULL OR TABLE_SCHEMA = @SchemaName)
                     ORDER BY ORDINAL_POSITION";

@@ -51,7 +51,6 @@ namespace D2G.Iris.ML.Data
             if (string.IsNullOrWhiteSpace(destTable))
                 throw new ArgumentException("Table name must be provided.", nameof(tableName));
 
-            // Parse database name from table name if specified (e.g., [Database].[Schema].[Table])
             string outputDatabase = null;
             string tableNameOnly = destTable;
 
@@ -60,18 +59,15 @@ namespace D2G.Iris.ML.Data
 
             if (parts.Length == 3)
             {
-                // Format: Database.Schema.Table
                 outputDatabase = parts[0];
                 tableNameOnly = $"[{parts[1]}].[{parts[2]}]";
             }
             else if (parts.Length == 2)
             {
-                // Format: Schema.Table (use current database)
                 tableNameOnly = $"[{parts[0]}].[{parts[1]}]";
             }
             else if (parts.Length == 1)
             {
-                // Format: Table (use current database and default schema)
                 tableNameOnly = $"[{parts[0]}]";
             }
 

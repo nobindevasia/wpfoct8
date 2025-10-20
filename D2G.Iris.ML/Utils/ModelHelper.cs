@@ -40,7 +40,7 @@ namespace D2G.Iris.ML.Utils
                     ConvertToStandardizedMetrics(metrics, config.ModelType),
                     config,
                     processedData,
-                    metrics); 
+                    metrics);
 
                 await Task.CompletedTask;
             }
@@ -109,7 +109,7 @@ namespace D2G.Iris.ML.Utils
             IStandardizedBaseMetrics metricsInfo,
             ModelConfig config,
             ProcessedData processedData,
-            object originalMetrics) 
+            object originalMetrics)
         {
             if (path == null)
             {
@@ -136,7 +136,7 @@ namespace D2G.Iris.ML.Utils
                 if (config != null && processedData != null)
                 {
                     if (config.DataBalancing.Method != DataBalanceMethod.None)
-                    { 
+                    {
                     writer.WriteLine("\n-------------------------------------------------------");
                     writer.WriteLine("Data Balancing Information:");
                     writer.WriteLine($"Method: {config.DataBalancing.Method}");
@@ -178,14 +178,14 @@ namespace D2G.Iris.ML.Utils
                 writer.WriteLine("\n-------------------------------------------------------");
                 writer.WriteLine(metricsInfo.CreateStandardizedMetricsMsg());
 
-               
+
                 if (originalMetrics is BinaryClassificationMetrics binaryMetrics)
                 {
                     writer.WriteLine("\n-------------------------------------------------------");
                     writer.WriteLine("Confusion Matrix:");
                     writer.WriteLine(binaryMetrics.ConfusionMatrix.GetFormattedConfusionTable());
                 }
-            
+
                 else if (originalMetrics is MulticlassClassificationMetrics multiClassMetrics)
                 {
                     writer.WriteLine("\n-------------------------------------------------------");

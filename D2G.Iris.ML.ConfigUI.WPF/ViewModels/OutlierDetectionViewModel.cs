@@ -34,14 +34,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private bool _isApplyingWinsorization = false;
         private string _winsorizationProgress = string.Empty;
 
-        // Database connection info
         private string? _connectionString;
         private string? _tableName;
         private string[]? _columns;
         private string? _targetColumn;
         private string? _whereClause;
-        private string? _cleanedTableName; // For tracking cleaned data (always a view)
-        private bool _isViewCreated = false; // Track if we created a view
+        private string? _cleanedTableName;
+        private bool _isViewCreated = false;
 
         public OutlierDetectionViewModel(IDialogService dialogService, IDatabaseAnalyticsService databaseAnalytics)
         {
@@ -206,7 +205,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _columns = columns;
             _targetColumn = targetColumn;
             _whereClause = whereClause;
-            _cleanedTableName = null; // Reset cleaned data state
+            _cleanedTableName = null;
 
             UpdateAvailableColumns();
         }
@@ -233,12 +232,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public Microsoft.ML.IDataView? GetCleanedDataView()
         {
-            return null; // Always use database view approach, never in-memory
+            return null;
         }
 
         public bool IsUsingInMemoryData()
         {
-            return false; // Always use database view approach
+            return false;
         }
 
         public void SelectAllColumns()
@@ -360,7 +359,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 var query = BuildRowCountQuery(_tableName!, column, _whereClause);
-                // Use a simple connection to execute the count query
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
                 await connection.OpenAsync();
                 using var command = new Microsoft.Data.SqlClient.SqlCommand(query, connection);
@@ -475,7 +473,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 CurrentStepDescription = "Initializing winsorization";
                 CurrentColumnBeingProcessed = "";
 
-                // Use efficient view approach for all dataset sizes
                 var dataSize = await EstimateDataSizeAsync();
                 Console.WriteLine($"Estimated data size: {dataSize} rows");
                 Console.WriteLine("Using database view approach (zero storage overhead, scales to any size)");
@@ -568,7 +565,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             try
             {
-                // Validate inputs
                 if (selectedColumns == null || !selectedColumns.Any())
                 {
                     throw new ArgumentException("No columns selected for winsorization");
@@ -591,7 +587,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
 
 
-                // Validate that we have enough data for processing
                 if (!selectedColumns.Any())
                 {
                     throw new ArgumentException("No columns selected for winsorization");
@@ -599,17 +594,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
 
-                // Use a two-step approach: first create a simple copy, then update with winsorization
-                // This avoids complex SQL that might cause exceptions
 
-                // Step 1: Create a simple copy of the table
                 var createTableSql = $@"
 SELECT *
 INTO {tempTableName}
 FROM {_tableName}
 {whereCondition}";
 
-                // Step 2: Build update statements for each selected column
                 var updateStatements = new List<string>();
                 foreach (var column in selectedColumns)
                 {
@@ -650,7 +641,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 Console.WriteLine($"WinsorUpperPercentile: {WinsorUpperPercentile}");
                 Console.WriteLine($"Create table SQL:\n{createTableSql}");
 
-                // Validate the create table SQL
                 if (string.IsNullOrWhiteSpace(createTableSql) || !createTableSql.Contains("SELECT") || !createTableSql.Contains("INTO"))
                 {
                     Console.WriteLine("ERROR: Invalid create table SQL generated!");
@@ -673,10 +663,8 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     throw new InvalidOperationException($"Database connection failed: {connEx.Message}", connEx);
                 }
 
-                // Execute each statement separately to avoid multi-statement issues
                 try
                 {
-                    // Step 1: Create the table copy
                     Console.WriteLine("Executing table creation...");
                     using (var createCommand = new Microsoft.Data.SqlClient.SqlCommand(createTableSql, connection))
                     {
@@ -685,7 +673,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     }
                     Console.WriteLine("Table creation completed successfully.");
 
-                    // Verify the table was created and has data
                     Console.WriteLine("Verifying table creation...");
                     using (var verifyCommand = new Microsoft.Data.SqlClient.SqlCommand($"SELECT COUNT(*) FROM {tempTableName}", connection))
                     {
@@ -699,7 +686,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         }
                     }
 
-                    // Step 2: Execute each update statement
                     var selectedColumnsList = selectedColumns.ToList();
 
                     if (updateStatements.Count != selectedColumnsList.Count)
@@ -714,7 +700,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
 
                         Console.WriteLine($"Executing update statement {i + 1}/{updateStatements.Count} for column {columnName}...");
 
-                        // Validate the update SQL
                         if (string.IsNullOrWhiteSpace(updateSql) || !updateSql.Contains("UPDATE") || !updateSql.Contains(columnName))
                         {
                             Console.WriteLine($"ERROR: Invalid update SQL for column {columnName}!");
@@ -745,7 +730,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 {
                     Console.WriteLine($"Error during winsorization execution: {ex.GetType().Name} - {ex.Message}");
 
-                    // Try to clean up the temp table if it was created
                     try
                     {
                         using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand($"IF OBJECT_ID('{tempTableName}') IS NOT NULL DROP TABLE {tempTableName}", connection);
@@ -758,7 +742,7 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         Console.WriteLine($"Could not clean up temporary table: {cleanupEx.Message}");
                     }
 
-                    throw; // Re-throw the original exception
+                    throw;
                 }
 
                 return tempTableName;
@@ -811,7 +795,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 await connection.OpenAsync();
                 Console.WriteLine("Fallback: Database connection opened successfully.");
 
-                // Step 1: Create a simple copy without any complex operations
                 var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
                 var createTableSql = $"SELECT * INTO {tempTableName} FROM {_tableName} {whereCondition}";
 
@@ -823,16 +806,13 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 }
                 Console.WriteLine("Fallback: Table copy created successfully.");
 
-                // Step 2: For each selected column, use a very simple update approach
                 foreach (var column in selectedColumns)
                 {
                     Console.WriteLine($"Fallback: Processing column {column}...");
 
-                    // Calculate percentiles using simple queries
                     var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
                     var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
 
-                    // Get percentiles using OVER clause (required for this SQL Server version)
                     var percentilesSql = $@"
                         SELECT DISTINCT
                             PERCENTILE_CONT({WinsorLowerPercentile / 100.0}) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as LowerBound,
@@ -857,7 +837,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
 
                     Console.WriteLine($"Fallback: Column {column} bounds: Lower={lowerBound}, Upper={upperBound}");
 
-                    // Apply winsorization with simple updates
                     var updateLowerSql = $@"
                         UPDATE {tempTableName}
                         SET [{column}] = {lowerBound}
@@ -870,7 +849,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         WHERE CAST([{column}] AS FLOAT) > {upperBound}
                         AND [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
 
-                    // Execute lower bound update
                     using (var updateLowerCommand = new Microsoft.Data.SqlClient.SqlCommand(updateLowerSql, connection))
                     {
                         updateLowerCommand.CommandTimeout = 30;
@@ -878,7 +856,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         Console.WriteLine($"Fallback: Updated {rowsAffected} rows for lower bound on column {column}");
                     }
 
-                    // Execute upper bound update
                     using (var updateUpperCommand = new Microsoft.Data.SqlClient.SqlCommand(updateUpperSql, connection))
                     {
                         updateUpperCommand.CommandTimeout = 30;
@@ -904,7 +881,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 Console.WriteLine("=== DATABASE DIAGNOSTICS ===");
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
 
-                // Test 1: Basic connection
                 Console.WriteLine("Test 1: Testing basic database connection...");
                 try
                 {
@@ -919,7 +895,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     return;
                 }
 
-                // Test 2: Check if table exists and is accessible
                 Console.WriteLine($"Test 2: Testing table access for '{_tableName}'...");
                 try
                 {
@@ -934,7 +909,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     Console.WriteLine($"✗ Table access failed: {tableEx.Message}");
                 }
 
-                // Test 3: Check PERCENTILE_CONT support
                 Console.WriteLine("Test 3: Testing PERCENTILE_CONT function support...");
                 try
                 {
@@ -949,7 +923,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     Console.WriteLine($"✗ PERCENTILE_CONT failed: {percentileEx.Message}");
                 }
 
-                // Test 4: Check temporary table creation permissions
                 Console.WriteLine("Test 4: Testing temporary table creation permissions...");
                 try
                 {
@@ -959,7 +932,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     createTempCommand.CommandTimeout = 10;
                     await createTempCommand.ExecuteNonQueryAsync();
 
-                    // Clean up
                     var dropTempSql = $"DROP TABLE {tempTableName}";
                     using var dropTempCommand = new Microsoft.Data.SqlClient.SqlCommand(dropTempSql, connection);
                     await dropTempCommand.ExecuteNonQueryAsync();
@@ -972,7 +944,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     Console.WriteLine("This is likely the cause of the winsorization failures.");
                 }
 
-                // Test 5: Check SELECT INTO permissions
                 Console.WriteLine("Test 5: Testing SELECT INTO permissions...");
                 try
                 {
@@ -982,7 +953,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     selectIntoCommand.CommandTimeout = 10;
                     await selectIntoCommand.ExecuteNonQueryAsync();
 
-                    // Clean up
                     var dropSql = $"DROP TABLE {tempTableName}";
                     using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand(dropSql, connection);
                     await dropCommand.ExecuteNonQueryAsync();
@@ -1075,16 +1045,13 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
             catch (Exception ex)
             {
                 Console.WriteLine($"Error estimating data size: {ex.Message}");
-                return 0; // Return 0 if estimation fails, will still use view approach
+                return 0;
             }
         }
 
-        // NOTE: Persistent table methods removed - we now use views for ALL dataset sizes
-        // This provides zero storage overhead and automatic cleanup for any data size
 
         private async Task<string?> CreateWinsorizedViewAsync(HashSet<string> selectedColumns)
         {
-            // Create a view for ALL dataset sizes - provides zero storage overhead and optimal scalability
             var guidPart = Guid.NewGuid().ToString("N")[..8];
             var viewName = $"vw_WinsorizedData_{DateTime.Now:yyyyMMdd_HHmmss}_{guidPart}";
 
@@ -1093,7 +1060,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                // Calculate percentiles for all selected columns with progress tracking
                 var percentileCalculations = new Dictionary<string, (decimal lower, decimal upper)>();
                 var totalColumns = selectedColumns.Count;
                 var currentColumn = 0;
@@ -1104,19 +1070,17 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 foreach (var column in selectedColumns)
                 {
                     currentColumn++;
-                    // Progress: 10% to 70% for percentile calculations
                     var stepProgress = 10 + ((currentColumn - 1) * 60) / totalColumns;
                     WinsorizationProgressPercentage = stepProgress;
 
                     Console.WriteLine($"[{currentColumn}/{totalColumns}] ({stepProgress}%) Processing column: {column}");
-                    CurrentColumnBeingProcessed = "";  // Don't show column name redundantly
+                    CurrentColumnBeingProcessed = "";
                     CurrentStepDescription = $"Calculating percentiles for {column}";
                     WinsorizationProgress = $"Processing percentiles ({currentColumn} of {totalColumns})";
 
                     var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
                     var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
 
-                    // Count valid values first
                     CurrentStepDescription = $"Counting valid values in {column}";
                     var countSql = $"SELECT COUNT(*) FROM {_tableName} WHERE {fullCondition}";
                     using (var countCommand = new Microsoft.Data.SqlClient.SqlCommand(countSql, connection))
@@ -1148,7 +1112,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                         Console.WriteLine($"  Column {column} percentiles calculated successfully");
                         CurrentStepDescription = $"Completed {column} - Lower: {lowerBound:F4}, Upper: {upperBound:F4}";
 
-                        // Brief pause to show the progress
                         await Task.Delay(100);
                     }
                     else
@@ -1158,20 +1121,16 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                     }
                 }
 
-                // Build the view SQL with CASE statements for winsorization
                 WinsorizationProgressPercentage = 75;
                 CurrentStepDescription = "Building winsorization view SQL";
                 CurrentColumnBeingProcessed = "";
                 WinsorizationProgress = "Generating view definition with winsorization logic";
 
-                // Get ALL columns from the table (not just _columns) to ensure ReportDateTime and other columns are included
                 var allTableColumns = new List<string>();
 
-                // Parse schema and table name - remove brackets first
                 string schemaName = "dbo";
                 string actualTableName = _tableName;
 
-                // Remove brackets and parse
                 var cleanedTableName = _tableName.Replace("[", "").Replace("]", "");
                 if (cleanedTableName.Contains('.'))
                 {
@@ -1250,7 +1209,7 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
 
                 Console.WriteLine($"View {viewName} created successfully - no storage overhead!");
 
-                await Task.Delay(500); // Brief pause to show completion
+                await Task.Delay(500);
                 WinsorizationProgressPercentage = 100;
                 CurrentStepDescription = "Winsorization completed successfully";
 
@@ -1263,24 +1222,16 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
             }
         }
 
-        // NOTE: In-memory processing methods removed - we now use views for ALL dataset sizes
-        // This eliminates memory pressure and provides consistent performance across any data volume
 
         public void Dispose()
         {
-            // Clean up database view if created
             CleanupDatabaseObjects();
         }
 
-        /// <summary>
-        /// Manually clean up the winsorized/cleaned view from the database.
-        /// Call this after training is complete or when you no longer need the cleaned data.
-        /// </summary>
         public void CleanupView()
         {
             CleanupDatabaseObjects();
 
-            // Reset state
             _cleanedTableName = null;
             _isViewCreated = false;
             RemoveOutliersEnabled = false;
@@ -1298,7 +1249,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
                 connection.Open();
 
-                // Clean up view (always a view in simplified approach)
                 var dropViewSql = $"DROP VIEW IF EXISTS {_cleanedTableName}";
                 using var dropCommand = new Microsoft.Data.SqlClient.SqlCommand(dropViewSql, connection);
                 dropCommand.ExecuteNonQuery();
@@ -1307,7 +1257,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
             catch (Exception ex)
             {
                 Console.WriteLine($"Warning: Could not clean up view {_cleanedTableName}: {ex.Message}");
-                // Don't throw - cleanup failure shouldn't break the application
             }
         }
     }

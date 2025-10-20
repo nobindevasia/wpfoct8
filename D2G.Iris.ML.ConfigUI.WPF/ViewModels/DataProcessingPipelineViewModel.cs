@@ -113,9 +113,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _intermediateResultsSchema, value);
         }
 
-        /// <summary>
-        /// Gets the full table name with database and schema (e.g., MyDB.dbo.IntermediateTable)
-        /// </summary>
         public string FullIntermediateTableName
         {
             get
@@ -172,7 +169,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _dataBalancingViewModel.SetConfiguration(config.DataBalancing);
             _featureEngineeringViewModel.SetConfiguration(config.FeatureEngineering);
 
-            // Parse OutputTableName if it contains database.schema.table format
             var outputTableName = config.Database?.OutputTableName ?? "";
             ParseFullTableName(outputTableName);
         }
@@ -183,7 +179,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             config.FeatureEngineering = _featureEngineeringViewModel.GetConfiguration();
             if (config.Database != null)
             {
-                // Save as full table name with database and schema
                 config.Database.OutputTableName = FullIntermediateTableName;
             }
         }
@@ -207,7 +202,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 return;
             }
 
-            // Remove brackets and parse: [Database].[Schema].[Table] or [Schema].[Table] or [Table]
             var cleaned = fullTableName.Replace("[", "").Replace("]", "");
             var parts = cleaned.Split('.');
 

@@ -141,7 +141,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     if (string.IsNullOrEmpty(ParameterValueString) && IsBooleanParameter)
                     {
-                        ParameterValueString = "false"; 
+                        ParameterValueString = "false";
                     }
                     else if (!IsBooleanParameter)
                     {
@@ -155,14 +155,14 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     IsBooleanParameter = underlyingType == typeof(bool);
                     ValueHint = ParameterHelper.GetValueHint(field.FieldType);
 
-           
+
                     if (string.IsNullOrEmpty(ParameterValueString) && IsBooleanParameter)
                     {
-                        ParameterValueString = "false"; 
+                        ParameterValueString = "false";
                     }
                     else if (!IsBooleanParameter)
                     {
-                        ParameterValueString = ""; 
+                        ParameterValueString = "";
                     }
                 }
                 else
@@ -190,7 +190,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             if (_selectedParameterType == null)
             {
-      
+
                 TryBasicParsing();
                 return;
             }
@@ -202,7 +202,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             catch (Exception ex)
             {
                 SetError($"Invalid value for {ParameterHelper.GetFriendlyTypeName(_selectedParameterType)}: {ex.Message}");
-           
+
                 TryBasicParsing();
             }
         }
@@ -211,7 +211,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             try
             {
-               
+
                 if (int.TryParse(ParameterValueString, out int intValue))
                     ParameterValue = intValue;
                 else if (double.TryParse(ParameterValueString, out double doubleValue))
@@ -243,7 +243,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private string ExtractParameterName(string displayText)
         {
-         
+
             if (string.IsNullOrEmpty(displayText))
                 return displayText;
 

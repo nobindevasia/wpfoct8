@@ -23,10 +23,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             _dialogService = dialogService;
             _schemaLoader = schemaLoader ?? new DatabaseSchemaLoader();
-            
+
             Databases = new ObservableCollection<string>();
             Tables = new ObservableCollection<TableInfo>();
-            
+
             InitializeCommands();
         }
 
@@ -71,7 +71,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public TableInfo? SelectedTable
         {
             get => _selectedTable;
-            set 
+            set
             {
                 if (SetProperty(ref _selectedTable, value) && value != null)
                 {
@@ -163,7 +163,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 var window = System.Windows.Application.Current.Windows
                     .OfType<Views.DatabaseExplorerWindow>()
                     .FirstOrDefault(w => w.DataContext == this);
-                
+
                 if (window != null)
                 {
                     window.DialogResult = true;
@@ -179,7 +179,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private bool CanLoadTables()
         {
-            return !string.IsNullOrWhiteSpace(Server) && 
+            return !string.IsNullOrWhiteSpace(Server) &&
                    !string.IsNullOrWhiteSpace(Database) &&
                    !IsLoadingTables;
         }
@@ -194,11 +194,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 var config = GetConfiguration();
-                
+
                 await System.Threading.Tasks.Task.Run(() =>
                 {
                     var tables = _schemaLoader.LoadTables(config);
-                    
+
                     System.Windows.Application.Current.Dispatcher.Invoke(() =>
                     {
                         foreach (var table in tables)

@@ -108,7 +108,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             DataProcessingPipeline = new DataProcessingPipelineViewModel();
             TrainingLogs = new TrainingLogsViewModel();
 
-            // Set up dependencies
             InputFields.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => TrainingParameters.TargetField);
             ExploratoryDataAnalysis.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => InputFields.GetConfiguration(), () => TrainingParameters.TargetField);
         }
@@ -310,14 +309,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return;
                 }
 
-                SelectedTabIndex = 6; // Switch to training logs tab
+                SelectedTabIndex = 6;
 
                 TrainingLogs.ClearLogs();
                 IsTraining = true;
 
                 await RunTrainingProcess();
 
-                // Clean up any database views created during data preparation
                 TrainingLogs.LogMessage("Cleaning up temporary database views...", "Info");
                 ExploratoryDataAnalysis.CleanupAfterTraining();
                 TrainingLogs.LogMessage("Cleanup completed successfully", "Success");
@@ -339,7 +337,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 IsTraining = false;
 
-                // Ensure cleanup happens even if training fails
                 try
                 {
                     ExploratoryDataAnalysis.CleanupAfterTraining();
@@ -347,7 +344,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 catch (Exception cleanupEx)
                 {
                     Console.WriteLine($"Warning: Cleanup after training failed: {cleanupEx.Message}");
-                    // Don't throw - cleanup failure shouldn't prevent the finally block from completing
                 }
             }
         }
@@ -361,7 +357,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     TrainingLogs.LogMessage("=============== Starting Training Process ===============", "Info");
                     TrainingLogs.LogMessage("Using Database-Side Analytics for optimized data loading", "Info");
 
-                    // Create temporary config file
                     string tempConfigPath = Path.Combine(Path.GetTempPath(), "modelconfig.json");
                     var serializableConfig = new Dictionary<string, ModelConfig>
                     {
@@ -380,7 +375,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     var config = _configManager.LoadConfiguration(tempConfigPath);
 
-                    // Connect to database
                     _sqlHandler.Connect(config.Database);
 
                     var enabledFields = config.InputFields
@@ -393,7 +387,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     TrainingLogs.LogMessage("=============== Loading Data ===============", "Info");
 
-                    // Check if we have cleaned data from EDA analysis
                     if (ExploratoryDataAnalysis.HasDataBeenLoaded())
                     {
                         TrainingLogs.LogMessage("EDA analysis detected - checking for cleaned data...", "Info");
@@ -402,7 +395,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         {
                             TrainingLogs.LogMessage("Using cleaned data from outlier detection analysis", "Info");
 
-                            // Use cleaned data if available
                             rawData = await ExploratoryDataAnalysis.GetCleanedDataAsIDataViewAsync(
                                 mlContext,
                                 enabledFields,
@@ -431,15 +423,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         rawData = LoadDataFromDatabase(config, enabledFields, mlContext);
                     }
 
-                    // Log data shape information
-                    // Note: GetRowCount() often returns null for database views, but data loading works correctly
                     var dataRowCount = rawData.GetRowCount();
                     var rowCountText = dataRowCount.HasValue ? $"{dataRowCount:N0}" : "streaming (count from database loader)";
                     TrainingLogs.LogMessage($"Final training dataset: {rowCountText} rows, {enabledFields.Length} features", "Info");
                     TrainingLogs.LogMessage($"Target field: {config.TargetField}", "Info");
                     TrainingLogs.LogMessage($"Model type: {config.ModelType}", "Info");
 
-                    // Process data
                     TrainingLogs.LogMessage("=============== Processing Data ===============", "Info");
                     var processedData = _dataProcessor.ProcessData(
                         mlContext,
@@ -449,7 +438,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     TrainingLogs.LogMessage($"Data processing completed. Feature count: {processedData.FeatureNames?.Length ?? 0}", "Success");
 
-                    // Train model
                     TrainingLogs.LogMessage("=============== Training Model ===============", "Info");
                     var modelTrainer = _modelTrainerFactory.CreateTrainer(config.ModelType);
 
@@ -462,7 +450,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     TrainingLogs.LogMessage("=============== Training Complete ===============", "Success");
 
-                    // Cleanup
                     try { File.Delete(tempConfigPath); } catch { }
                 }
                 catch (Exception ex)

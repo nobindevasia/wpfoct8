@@ -585,15 +585,12 @@
         let currentSegment = 'Scatter Plot';
 
         function switchWheel(wheel) {
-            // Hide all wheels
             document.getElementById('edaWheel').style.display = 'none';
             document.getElementById('processingWheel').style.display = 'none';
             document.getElementById('trainingWheel').style.display = 'none';
 
-            // Show selected wheel
             document.getElementById(wheel + 'Wheel').style.display = 'block';
 
-            // Update active step
             const steps = document.querySelectorAll('.step');
             steps.forEach(s => s.classList.remove('active'));
 
@@ -603,7 +600,6 @@
 
             currentWheel = wheel;
 
-            // Update progress
             if (wheel === 'eda') updateProgress(45);
             if (wheel === 'processing') updateProgress(70);
             if (wheel === 'training') updateProgress(90);
@@ -614,7 +610,6 @@
             document.getElementById('detailTitle').textContent = title;
             document.getElementById('detailContent').innerHTML = content;
 
-            // Update active segment
             const segments = document.querySelectorAll('.segment');
             segments.forEach(s => s.classList.remove('active'));
             event.currentTarget.classList.add('active');

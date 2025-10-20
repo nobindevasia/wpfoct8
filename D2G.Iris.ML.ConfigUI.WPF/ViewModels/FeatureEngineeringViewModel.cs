@@ -33,7 +33,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     OnPropertyChanged(nameof(IsPcaSelected));
                     OnPropertyChanged(nameof(IsCorrelationSelected));
                     OnPropertyChanged(nameof(IsMethodSelected));
-                    OnPropertyChanged(nameof(IsEnabled)); 
+                    OnPropertyChanged(nameof(IsEnabled));
                 }
             }
         }

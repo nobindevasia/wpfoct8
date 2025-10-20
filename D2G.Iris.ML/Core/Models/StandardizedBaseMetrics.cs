@@ -24,7 +24,7 @@ namespace D2G.Iris.ML.Core.Models
     {
         public string TrainerName { get; set; }
         public int NumberColumns { get; set; }
-        public long NumberRows { get; set; }  
+        public long NumberRows { get; set; }
         public string[] InputColumnNames { get; set; }
         public string[] OutputColumnNames { get; set; }
     }
@@ -49,7 +49,7 @@ namespace D2G.Iris.ML.Core.Models
                    $"Precision: {PositivePrecision:F4}\n" +
                    $"Recall: {PositiveRecall:F4}\n" +
                    $"F1 Score: {F1Score:F4}\n"+
-                   $"Area Under Precision-Recall Curve: {AreaUnderPrecisionRecallCurve:F4}";    
+                   $"Area Under Precision-Recall Curve: {AreaUnderPrecisionRecallCurve:F4}";
         }
     }
 
@@ -71,7 +71,7 @@ namespace D2G.Iris.ML.Core.Models
     }
 
 
-   
+
 
     public class StandardizedRegressionMetrics : StandardizedBaseMetrics
     {
@@ -89,7 +89,7 @@ namespace D2G.Iris.ML.Core.Models
                    $"Root Mean Squared Error: {RootMeanSquaredError:F4}";
         }
 
-        
+
     }
     public class DefaultStandardizedMetrics : StandardizedBaseMetrics
     {

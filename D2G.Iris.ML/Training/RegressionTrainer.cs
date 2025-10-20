@@ -102,7 +102,6 @@ namespace D2G.Iris.ML.Training
                     OptimizingMetric = metric
                 };
 
-                // Limit the trainers if MaxModels is specified
                 if (config.AutoML.MaxModels > 0)
                 {
                     LimitTrainers(experimentSettings, config.AutoML.MaxModels);
@@ -166,13 +165,11 @@ namespace D2G.Iris.ML.Training
         {
             try
             {
-                // Access MaxModels field from the base ExperimentSettings class
                 var type = experimentSettings.GetType();
                 var maxModelsField = type.GetField("MaxModels", BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
 
                 if (maxModelsField != null)
                 {
-                    // Check the field type and convert accordingly
                     if (maxModelsField.FieldType == typeof(uint))
                     {
                         maxModelsField.SetValue(experimentSettings, (uint)maxModels);
@@ -268,17 +265,13 @@ namespace D2G.Iris.ML.Training
                 config.ModelType,
                 config.TrainingParameters);
 
-            // Only normalize if Features column doesn't already exist (i.e., not from PCA)
-            // PCA already normalizes data internally
             IEstimator<ITransformer> pipeline;
             if (split.TrainSet.Schema.GetColumnOrNull("Features").HasValue)
             {
-                // Features already exists and normalized (e.g., from PCA), skip normalization
                 pipeline = trainer;
             }
             else
             {
-                // Features doesn't exist or isn't normalized, apply normalization
                 pipeline = GetBasePipeline(_mlContext)
                     .Append(trainer);
             }
@@ -317,13 +310,10 @@ namespace D2G.Iris.ML.Training
         {
             if (dataView.Schema.GetColumnOrNull("Features").HasValue)
             {
-                // Features column already exists, just return the data as-is
-                // No need to materialize - keep it as IDataView for lazy evaluation
                 return dataView;
             }
             else
             {
-                // Features column doesn't exist, create it by concatenating feature columns
                 return _mlContext.Transforms.Concatenate("Features", featureNames)
                     .Fit(dataView)
                     .Transform(dataView);

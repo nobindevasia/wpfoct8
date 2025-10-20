@@ -15,7 +15,7 @@ namespace D2G.Iris.ML.Training
     public class BinaryClassificationTrainer : BaseModelTrainer
     {
 
-        
+
 
         public BinaryClassificationTrainer(MLContext mlContext, TrainerFactory trainerFactory)
             : base(mlContext, trainerFactory)
@@ -38,11 +38,11 @@ namespace D2G.Iris.ML.Training
 
                 if (dataView.Schema.GetColumnOrNull("Label").HasValue)
                 {
-                    
+
                     var labelType = dataView.Schema["Label"].Type;
                     if (labelType.RawType != typeof(bool))
                     {
-                        
+
                         var labelPipeline = mlContext.Transforms.Conversion.ConvertType(
                             outputColumnName: "Label", inputColumnName: "Label", outputKind: DataKind.Boolean);
                         labeledData = labelPipeline.Fit(dataView).Transform(dataView);
@@ -54,7 +54,7 @@ namespace D2G.Iris.ML.Training
                 }
                 else
                 {
-                    
+
                     var labelPipeline = mlContext.Transforms.CopyColumns(
                             outputColumnName: "RawLabel", inputColumnName: config.TargetField)
                         .Append(mlContext.Transforms.Conversion.ConvertType(
@@ -109,7 +109,6 @@ namespace D2G.Iris.ML.Training
                     OptimizingMetric = metric
                 };
 
-                // Limit the trainers if MaxModels is specified
                 if (config.AutoML.MaxModels > 0)
                 {
                     LimitTrainers(experimentSettings, config.AutoML.MaxModels);
@@ -256,18 +255,14 @@ namespace D2G.Iris.ML.Training
                 }
             }
 
-            // Only normalize if Features column doesn't already exist (i.e., not from PCA)
-            // PCA already normalizes data internally
             IEstimator<ITransformer> pipeline;
             if (split.TrainSet.Schema.GetColumnOrNull("Features").HasValue)
             {
-                // Features already exists and normalized (e.g., from PCA), skip normalization
                 pipeline = trainer
                     .Append(mlContext.Transforms.CopyColumns("Probability", "Score"));
             }
             else
             {
-                // Features doesn't exist or isn't normalized, apply normalization
                 pipeline = GetBasePipeline(mlContext)
                     .Append(trainer)
                     .Append(mlContext.Transforms.CopyColumns("Probability", "Score"));
@@ -315,13 +310,10 @@ namespace D2G.Iris.ML.Training
         {
             if (labeledData.Schema.GetColumnOrNull("Features").HasValue)
             {
-                // Features column already exists, just return the data as-is
-                // No need to materialize - keep it as IDataView for lazy evaluation
                 return labeledData;
             }
             else
             {
-                // Features column doesn't exist, create it by concatenating feature columns
                 return _mlContext.Transforms.Concatenate("Features", featureNames)
                     .Fit(labeledData)
                     .Transform(labeledData);
@@ -332,13 +324,11 @@ namespace D2G.Iris.ML.Training
         {
             try
             {
-                // Access MaxModels field from the base ExperimentSettings class
                 var type = experimentSettings.GetType();
                 var maxModelsField = type.GetField("MaxModels", BindingFlags.Public | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
 
                 if (maxModelsField != null)
                 {
-                    // Check the field type and convert accordingly
                     if (maxModelsField.FieldType == typeof(uint))
                     {
                         maxModelsField.SetValue(experimentSettings, (uint)maxModels);

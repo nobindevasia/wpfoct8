@@ -7,9 +7,6 @@ using Microsoft.Web.WebView2.Wpf;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.Views
 {
-    /// <summary>
-    /// Interaction logic for ViolinPlotView.xaml
-    /// </summary>
     public partial class ViolinPlotView : UserControl
     {
         private ViolinPlotViewModel? _viewModel;
@@ -35,8 +32,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             {
                 _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             }
-            // Don't set _viewModel to null or reset _webViewInitialized
-            // Keep the state so it works when returning to this view
         }
 
         private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -69,7 +64,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
 
             var html = _viewModel?.PlotHtml;
 
-            // Use BeginInvoke with high priority to ensure immediate update
             Dispatcher.BeginInvoke(async () =>
             {
                 await EnsureWebViewAsync();
@@ -91,7 +85,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             }
             catch
             {
-                // Initialization failed, will retry next time
                 _webViewInitialized = false;
             }
         }
@@ -116,7 +109,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             }
             catch
             {
-                // WebView2 might not be ready yet, ignore
             }
         }
     }

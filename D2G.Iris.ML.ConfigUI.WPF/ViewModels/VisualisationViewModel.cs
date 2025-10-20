@@ -25,7 +25,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private CancellationTokenSource? _cancellationTokenSource;
         private string _dataInfo = string.Empty;
 
-        // Database connection info
         private string? _connectionString;
         private string? _tableName;
         private string[]? _columns;
@@ -186,7 +185,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 var totalColumns = numericColumns.Count + categoricalColumns.Count;
                 var processedColumns = 0;
 
-                // Process numeric columns first
                 Console.WriteLine($"Starting to process {numericColumns.Count} numeric columns");
                 foreach (var column in numericColumns)
                 {
@@ -221,7 +219,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     await Task.Delay(50, cancellationToken);
                 }
 
-                // Process categorical columns
                 foreach (var column in categoricalColumns)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
@@ -249,7 +246,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
             catch (OperationCanceledException)
             {
-                // Operation was cancelled by user
                 ProgressMessage = "Generation cancelled";
                 await Task.Delay(1000);
             }
@@ -300,7 +296,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             try
             {
-                // Test 1: Simple connection
                 _dialogService.ShowInfoDialog("Testing database connection...", "Test");
 
                 var connectionTest = await _databaseAnalytics.TestConnectionAsync(_connectionString);
@@ -310,13 +305,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return;
                 }
 
-                // Test 2: Table schema
                 _dialogService.ShowInfoDialog("Testing schema retrieval...", "Test");
 
                 var schema = await _databaseAnalytics.GetTableSchemaAsync(_connectionString, _tableName);
                 _dialogService.ShowInfoDialog($"Schema test passed. Found {schema.Count} columns", "Test Success");
 
-                // Test 3: Debug histogram steps on first numeric column
                 if (schema.Any())
                 {
                     var firstNumericColumn = schema.FirstOrDefault(s => IsNumericType(s.DataType))?.ColumnName;
@@ -372,7 +365,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 {
                     Console.WriteLine($"No histogram data returned for column: {columnName}");
 
-                    // Debug basic operations
                     var debugInfo = await _databaseAnalytics.DebugBasicOperationsAsync(
                         _connectionString!, _tableName!, columnName);
                     Console.WriteLine($"Debug info for {columnName}:");
@@ -381,7 +373,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     return null;
                 }
 
-                // Create data series for SciChart
                 var dataSeries = new XyDataSeries<double, long>();
                 var histogramBins = new List<HistogramBin>();
 
@@ -398,7 +389,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     });
                 }
 
-                // Get column statistics for the summary
                 var columnStats = await GetColumnStatisticsAsync(columnName);
                 var statistics = CreateNumericStatisticalSummary(columnStats, histogramData.Sum(h => h.Count));
 
@@ -435,7 +425,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 if (!categoryData.Any())
                     return null;
 
-                // Create data series for SciChart
                 var dataSeries = new XyDataSeries<double, long>();
                 var histogramBins = new List<HistogramBin>();
 
@@ -454,7 +443,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     });
                 }
 
-                // Create statistics for categorical data
                 var statistics = CreateCategoricalStatisticalSummary(categoryData);
 
                 return new HistogramViewModel
@@ -499,19 +487,19 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return new StatisticalSummary
             {
                 Mean = columnStats.Mean ?? 0,
-                Median = 0, // Would need additional query to calculate
+                Median = 0,
                 StandardDeviation = columnStats.StandardDeviation ?? 0,
                 Variance = columnStats.Variance ?? 0,
                 Min = columnStats.Min ?? 0,
                 Max = columnStats.Max ?? 0,
                 Range = (columnStats.Max ?? 0) - (columnStats.Min ?? 0),
-                Q1 = 0, // Would need additional query
-                Q3 = 0, // Would need additional query
-                IQR = 0, // Would need additional query
-                Skewness = 0, // Would need additional query
-                Kurtosis = 0, // Would need additional query
+                Q1 = 0,
+                Q3 = 0,
+                IQR = 0,
+                Skewness = 0,
+                Kurtosis = 0,
                 UniqueValues = (int)(columnStats.UniqueCount ?? 0),
-                MissingValues = 0, // Could get from missing value analysis
+                MissingValues = 0,
                 MostFrequentValue = "",
                 MostFrequentCount = 0
             };
@@ -525,10 +513,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return new StatisticalSummary
             {
                 UniqueValues = categoryData.Count,
-                MissingValues = 0, // Could get from missing value analysis
+                MissingValues = 0,
                 MostFrequentValue = mostFrequent?.Category ?? "",
                 MostFrequentCount = (int)(mostFrequent?.Count ?? 0),
-                // Other numeric stats don't apply to categorical data
                 Mean = 0,
                 Median = 0,
                 StandardDeviation = 0,
@@ -579,7 +566,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 SelectedHistogram = histogram;
                 IsDetailViewVisible = true;
 
-                // If this is a preview-only histogram, load full data
                 if (histogram.IsPreviewOnly)
                 {
                     await LoadFullHistogramAsync(histogram);
@@ -599,7 +585,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 histogram.IsLoading = true;
 
-                // Reload with more detailed data if needed
                 HistogramViewModel? detailedHistogram = null;
 
                 if (histogram.ColumnType == "Numeric")

@@ -219,17 +219,17 @@ namespace D2G.Iris.ML.FeatureEngineering
                 processedData = featurePipeline.Fit(data).Transform(data);
             }
 
-            
+
             var labelColumnInfo = processedData.Schema.GetColumnOrNull("Label");
             if (labelColumnInfo == null)
             {
-                
+
                 var labelPipeline = _mlContext.Transforms.CopyColumns("Label", targetField);
                 processedData = labelPipeline.Fit(processedData).Transform(processedData);
             }
             else if (labelColumnInfo.Value.Type.RawType == typeof(bool))
             {
-                
+
                 var convertPipeline = _mlContext.Transforms.Conversion.ConvertType(
                     "Label", "Label", DataKind.Int64);
                 processedData = convertPipeline.Fit(processedData).Transform(processedData);
@@ -252,17 +252,17 @@ namespace D2G.Iris.ML.FeatureEngineering
                 processedData = featurePipeline.Fit(data).Transform(data);
             }
 
-            
+
             var labelColumnInfo = processedData.Schema.GetColumnOrNull("Label");
             if (labelColumnInfo == null)
             {
-                
+
                 var labelPipeline = _mlContext.Transforms.CopyColumns("Label", targetField);
                 processedData = labelPipeline.Fit(processedData).Transform(processedData);
             }
             else if (labelColumnInfo.Value.Type.RawType == typeof(bool))
             {
-                
+
                 var convertPipeline = _mlContext.Transforms.Conversion.ConvertType(
                     "Label", "Label", DataKind.Single);
                 processedData = convertPipeline.Fit(processedData).Transform(processedData);

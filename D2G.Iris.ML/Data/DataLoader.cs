@@ -31,7 +31,7 @@ namespace D2G.Iris.ML.Data
             Console.WriteLine("=============== Loading Data ===============");
 
             string fullTableName = tableName.Contains('[')
-                ? tableName 
+                ? tableName
                 : (tableName.Contains('.')
                     ? string.Join('.', tableName.Split('.').Select(part => $"[{part}]"))
                     : $"[{tableName}]");
@@ -89,6 +89,6 @@ namespace D2G.Iris.ML.Data
             return dataView;
         }
 
-      
+
     }
 }

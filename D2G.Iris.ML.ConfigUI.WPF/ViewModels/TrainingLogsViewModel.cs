@@ -70,12 +70,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 LogEntries.Add(logEntry);
 
-               
+
                 string timestamp = logEntry.Timestamp.ToString("yyyy-MM-dd HH:mm:ss");
                 string formattedMessage = $"[{timestamp}] [{level}] {message}{Environment.NewLine}";
                 LogText += formattedMessage;
 
-              
+
                 while (LogEntries.Count > 1000)
                 {
                     LogEntries.RemoveAt(0);

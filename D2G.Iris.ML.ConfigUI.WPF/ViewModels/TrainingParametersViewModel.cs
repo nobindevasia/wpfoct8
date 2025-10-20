@@ -28,7 +28,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private bool _useCrossValidation = false;
         private int _numberOfFolds = 5;
 
-     
+
         private ModelType _modelType = ModelType.BinaryClassification;
         private string _targetField = "Label";
 
@@ -175,7 +175,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             if (_currentModelType != modelType)
             {
                 _currentModelType = modelType;
-                _modelType = modelType; 
+                _modelType = modelType;
                 UpdateAvailableAlgorithms();
                 Parameters.Clear();
                 UpdateAvailableMetrics();

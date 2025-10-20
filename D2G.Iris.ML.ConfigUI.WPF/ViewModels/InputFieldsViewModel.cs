@@ -26,7 +26,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _dialogService = dialogService;
             _schemaLoader = new DatabaseSchemaLoader();
             InputFields = new ObservableCollection<InputFieldItem>();
-            InputFields.CollectionChanged += (s, e) => 
+            InputFields.CollectionChanged += (s, e) =>
             {
                 ((RelayCommand)SelectAllCommand).RaiseCanExecuteChanged();
                 ((RelayCommand)DeselectAllCommand).RaiseCanExecuteChanged();

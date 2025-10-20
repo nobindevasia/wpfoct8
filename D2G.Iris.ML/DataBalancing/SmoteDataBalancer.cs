@@ -34,24 +34,24 @@ namespace D2G.Iris.ML.DataBalancing
             {
                 IDataView preparedData = data;
 
-                
+
                 if (data.Schema.GetColumnOrNull("Features") == null)
                 {
                     var pipeline = mlContext.Transforms.Concatenate("Features", featureNames);
                     preparedData = pipeline.Fit(data).Transform(data);
                 }
 
-                
+
                 var labelColumnInfo = data.Schema.GetColumnOrNull("Label");
                 if (labelColumnInfo == null)
                 {
-                    
+
                     var labelPipeline = mlContext.Transforms.CopyColumns("Label", targetField);
                     preparedData = labelPipeline.Fit(preparedData).Transform(preparedData);
                 }
                 else if (labelColumnInfo.Value.Type.RawType == typeof(bool))
                 {
-                    
+
                     var convertPipeline = mlContext.Transforms.Conversion.ConvertType(
                         "Label", "Label", DataKind.Int64);
                     preparedData = convertPipeline.Fit(preparedData).Transform(preparedData);
@@ -145,7 +145,6 @@ namespace D2G.Iris.ML.DataBalancing
                     Label = 1
                 }));
 
-                // Create schema definition with fixed vector size to avoid VarVector
                 int featureCount = featureNames.Length;
                 var schemaDefinition = SchemaDefinition.Create(typeof(FeatureVector));
                 schemaDefinition[nameof(FeatureVector.Features)].ColumnType =

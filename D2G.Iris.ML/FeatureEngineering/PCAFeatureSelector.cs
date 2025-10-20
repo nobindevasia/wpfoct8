@@ -99,11 +99,11 @@ namespace D2G.Iris.ML.FeatureEngineering
                 }
                 else
                 {
-                    
+
                     var labelColumnInfo = data.Schema.GetColumnOrNull(targetField);
                     if (labelColumnInfo != null && labelColumnInfo.Value.Type.RawType == typeof(bool))
                     {
-                        
+
                         data = mlContext.Transforms
                             .Conversion.ConvertType(
                                 outputColumnName: targetField,

@@ -967,6 +967,117 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return distributionData;
         }
 
+        public async Task<BoxPlotData> GetBoxPlotDataAsync(string connectionString, string tableName, string columnName, string? whereClause = null)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                await connection.OpenAsync();
+
+                var nullCheckCondition = $"{columnName} IS NOT NULL";
+                var fullWhereClause = string.IsNullOrWhiteSpace(whereClause)
+                    ? $" WHERE {nullCheckCondition}"
+                    : $" WHERE ({whereClause}) AND {nullCheckCondition}";
+
+                var query = $@"
+                    WITH Percentiles AS (
+                        SELECT DISTINCT
+                            PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY {columnName}) OVER () as Q1,
+                            PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY {columnName}) OVER () as Median,
+                            PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY {columnName}) OVER () as Q3
+                        FROM {tableName}{fullWhereClause}
+                    ),
+                    Stats AS (
+                        SELECT
+                            MIN({columnName}) as MinVal,
+                            MAX({columnName}) as MaxVal,
+                            AVG(CAST({columnName} AS FLOAT)) as MeanVal,
+                            STDEV({columnName}) as StdDevVal
+                        FROM {tableName}{fullWhereClause}
+                    )
+                    SELECT
+                        (SELECT Q1 FROM Percentiles) as Q1,
+                        (SELECT Median FROM Percentiles) as Median,
+                        (SELECT Q3 FROM Percentiles) as Q3,
+                        Stats.MinVal,
+                        Stats.MaxVal,
+                        Stats.MeanVal,
+                        Stats.StdDevVal
+                    FROM Stats";
+
+                BoxPlotData boxPlotData = null;
+
+                using (var command = new SqlCommand(query, connection))
+                {
+                    command.CommandTimeout = 300;
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            var q1 = reader.IsDBNull(0) ? 0 : Convert.ToDouble(reader.GetValue(0));
+                            var median = reader.IsDBNull(1) ? 0 : Convert.ToDouble(reader.GetValue(1));
+                            var q3 = reader.IsDBNull(2) ? 0 : Convert.ToDouble(reader.GetValue(2));
+                            var min = reader.IsDBNull(3) ? 0 : Convert.ToDouble(reader.GetValue(3));
+                            var max = reader.IsDBNull(4) ? 0 : Convert.ToDouble(reader.GetValue(4));
+                            var mean = reader.IsDBNull(5) ? 0 : Convert.ToDouble(reader.GetValue(5));
+                            var stdDev = reader.IsDBNull(6) ? 0 : Convert.ToDouble(reader.GetValue(6));
+
+                            var iqr = q3 - q1;
+                            var lowerWhisker = Math.Max(min, q1 - 1.5 * iqr);
+                            var upperWhisker = Math.Min(max, q3 + 1.5 * iqr);
+
+                            boxPlotData = new BoxPlotData
+                            {
+                                ColumnName = columnName,
+                                Q1 = q1,
+                                Median = median,
+                                Q3 = q3,
+                                Min = min,
+                                Max = max,
+                                Mean = mean,
+                                StdDev = stdDev,
+                                LowerWhisker = lowerWhisker,
+                                UpperWhisker = upperWhisker,
+                                Outliers = new List<OutlierPoint>()
+                            };
+                        }
+                    }
+                }
+
+                // Fetch outliers (values beyond whiskers) - limited to 500 for performance
+                if (boxPlotData != null)
+                {
+                    var outlierWhereClause = string.IsNullOrWhiteSpace(whereClause)
+                        ? $" WHERE {columnName} IS NOT NULL AND ({columnName} < {boxPlotData.LowerWhisker} OR {columnName} > {boxPlotData.UpperWhisker})"
+                        : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL AND ({columnName} < {boxPlotData.LowerWhisker} OR {columnName} > {boxPlotData.UpperWhisker})";
+
+                    var outlierQuery = $@"
+                        SELECT TOP 500
+                            CAST({columnName} AS FLOAT) as Value,
+                            CAST(ROW_NUMBER() OVER (ORDER BY {columnName}) AS INT) as RowIdx
+                        FROM {tableName}{outlierWhereClause}
+                        ORDER BY {columnName}";
+
+                    using (var command = new SqlCommand(outlierQuery, connection))
+                    {
+                        command.CommandTimeout = 300;
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                boxPlotData.Outliers.Add(new OutlierPoint
+                                {
+                                    Value = reader.IsDBNull(0) ? 0 : reader.GetDouble(0),
+                                    RowIndex = reader.IsDBNull(1) ? 0 : reader.GetInt32(1)
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return boxPlotData;
+            }
+        }
+
         private static bool IsNumericSqlType(string? dataType)
         {
             if (string.IsNullOrWhiteSpace(dataType))
@@ -1126,6 +1237,28 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
     {
         public double X { get; set; }
         public double Y { get; set; }
+    }
+
+    public class BoxPlotData
+    {
+        public string ColumnName { get; set; }
+        public double Min { get; set; }
+        public double Q1 { get; set; }
+        public double Median { get; set; }
+        public double Q3 { get; set; }
+        public double Max { get; set; }
+        public double Mean { get; set; }
+        public double StdDev { get; set; }
+        public double IQR => Q3 - Q1;
+        public double LowerWhisker { get; set; }
+        public double UpperWhisker { get; set; }
+        public List<OutlierPoint> Outliers { get; set; } = new List<OutlierPoint>();
+    }
+
+    public class OutlierPoint
+    {
+        public double Value { get; set; }
+        public int RowIndex { get; set; }
     }
 
     #endregion

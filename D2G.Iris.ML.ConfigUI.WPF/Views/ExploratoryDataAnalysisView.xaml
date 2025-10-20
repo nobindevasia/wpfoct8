@@ -188,6 +188,10 @@
                 <views:ViolinPlotView DataContext="{Binding ViolinPlotViewModel}"/>
             </TabItem>
 
+            <TabItem Header="Box Plots">
+                <views:BoxPlotView DataContext="{Binding BoxPlotViewModel}"/>
+            </TabItem>
+
             <TabItem Header="Correlation Heatmap">
                 <Grid>
                     <Grid.RowDefinitions>

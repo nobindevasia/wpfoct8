@@ -8,6 +8,7 @@ using D2G.Iris.ML.Configuration;
 using D2G.Iris.ML.Data;
 using D2G.Iris.ML.Training;
 using Microsoft.ML;
+using SciChart.Charting.Visuals;
 
 namespace D2G.Iris.ML.ConfigUI.WPF
 {
@@ -17,6 +18,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            SciChartSurface.SetRuntimeLicenseKey("dkBLL7cFRf2kjrIDBv5UnMIOlzcrRi44w3/vQzJbsvsQ1s/F7BAmoG368pM381psDnVdB7vAyW2uH1Hs9A9gN/9nJIL9mQ4RHgln" +
+                                                 "e+3ozSqZ+p7gF3tYGzMoDzG6noqUxpROjhpJh4gLxOt0CJxnp4ppf2EnxjIK70IuYIJHWUxvL91WPMjCoWYNAkN8V0JBNC86KRpj9G" +
+                                                 "U6C7d1AQIp7YRC5pR2DhlxQILJ095mWDYiewPQ2GO1G26CMfMWxmevohKyGZkQgtzJTynusv7E7b/NGnnlKrGlvGujlDoMuRiRH9XkA" +
+                                                 "fGCQm4bWnixsuHX3fIs7lS4IRKL1AWSPVheYnyPjrhnQPswbTVUBBMeXwgv22mVAfABvu1fxFWBO+WHjcC57GLWww/dp8KfI3Pa6oXy" +
+                                                 "lI+KvgaXKysk/g3uc7TpwiNhNNMbHVy80/GIrYvhO3qmc0Uobdb0k9xENdLyL5gRHWgEoKmkban7f4QCsDrIoh2klh38eoE=");
+
             var services = new ServiceCollection();
 
             services.AddSingleton<IConfigurationService, ConfigurationService>();

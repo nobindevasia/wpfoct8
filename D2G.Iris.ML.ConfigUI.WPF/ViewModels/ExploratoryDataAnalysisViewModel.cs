@@ -50,6 +50,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private OutlierDetectionViewModel _outlierDetectionViewModel;
         private ScatterPlotViewModel _scatterPlotViewModel;
         private ViolinPlotViewModel _violinPlotViewModel;
+        private BoxPlotViewModel _boxPlotViewModel;
         private UserControl? _correlationHeatmapChart;
 
         private DatasetSummary? _currentDatasetSummary;
@@ -69,6 +70,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService, _databaseAnalytics);
             _scatterPlotViewModel = new ScatterPlotViewModel(dialogService, _databaseAnalytics);
             _violinPlotViewModel = new ViolinPlotViewModel(dialogService, _databaseAnalytics);
+            _boxPlotViewModel = new BoxPlotViewModel(dialogService, _databaseAnalytics);
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
             GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
@@ -146,6 +148,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _violinPlotViewModel;
             set => SetProperty(ref _violinPlotViewModel, value);
+        }
+
+        public BoxPlotViewModel BoxPlotViewModel
+        {
+            get => _boxPlotViewModel;
+            set => SetProperty(ref _boxPlotViewModel, value);
         }
 
         public UserControl? CorrelationHeatmapChart
@@ -411,6 +419,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
                 System.IO.File.AppendAllText(logPath, "EDA: ✓ Violin plot VM setup complete\n");
                 Console.WriteLine("EDA: ✓ Violin plot VM setup complete");
+
+                System.IO.File.AppendAllText(logPath, "EDA: Setting up box plot view model\n");
+                Console.WriteLine("EDA: Setting up box plot view model");
+                _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+                System.IO.File.AppendAllText(logPath, "EDA: ✓ Box plot VM setup complete\n");
+                Console.WriteLine("EDA: ✓ Box plot VM setup complete");
 
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +

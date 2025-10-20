@@ -54,7 +54,10 @@
       "WebFetch(domain:github.com)",
       "Bash(curl -s \"https://raw.githubusercontent.com/nobindevasia/oct17/main/D2G.Iris.ML.ConfigUI.WPF/ViewModels/ViolinPlotViewModel.cs\" -o /tmp/old_violin.cs)",
       "Bash(curl -s \"https://raw.githubusercontent.com/nobindevasia/oct17/main/D2G.Iris.ML.ConfigUI.WPF/ViewModels/ExploratoryDataAnalysisViewModel.cs\" -o /tmp/old_eda.cs)",
-      "Bash(curl -s \"https://api.github.com/repos/nobindevasia/oct17/contents/D2G.Iris.ML.ConfigUI.WPF/ViewModels\")"
+      "Bash(curl -s \"https://api.github.com/repos/nobindevasia/oct17/contents/D2G.Iris.ML.ConfigUI.WPF/ViewModels\")",
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:www.scichart.com)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

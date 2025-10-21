@@ -382,7 +382,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         .Select(f => f.Name)
                         .ToArray();
 
-                    // Use seed from AutoML config if provided, otherwise use default seed (42) or null for random
                     int? mlContextSeed = config.AutoML?.Seed.HasValue == true
                         ? (int)config.AutoML.Seed.Value
                         : 42;

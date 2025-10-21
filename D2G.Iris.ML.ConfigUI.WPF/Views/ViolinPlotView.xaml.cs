@@ -1,3 +1,4 @@
+using System;
 using System.ComponentModel;
 using System.Threading.Tasks;
 using System.Windows;
@@ -11,6 +12,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
     {
         private ViolinPlotViewModel? _viewModel;
         private bool _webViewInitialized;
+        private string? _pendingHtml;
 
         public ViolinPlotView()
         {
@@ -18,12 +20,20 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
             DataContextChanged += OnDataContextChanged;
+            IsVisibleChanged += OnIsVisibleChanged;
         }
 
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
             await EnsureWebViewAsync();
-            UpdatePlotHtml(_viewModel?.PlotHtml);
+            if (_pendingHtml != null)
+            {
+                await UpdatePlotHtmlAsync(_pendingHtml);
+            }
+            else
+            {
+                await UpdatePlotHtmlAsync(_viewModel?.PlotHtml);
+            }
         }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -51,24 +61,38 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             _ = Dispatcher.InvokeAsync(async () =>
             {
                 await EnsureWebViewAsync();
-                UpdatePlotHtml(_viewModel?.PlotHtml);
+                await UpdatePlotHtmlAsync(_viewModel?.PlotHtml);
             });
         }
 
-        private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private async void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(ViolinPlotViewModel.PlotHtml))
-            {
-                return;
-            }
-
-            var html = _viewModel?.PlotHtml;
-
-            Dispatcher.BeginInvoke(async () =>
+            if (IsVisible && _pendingHtml != null)
             {
                 await EnsureWebViewAsync();
-                UpdatePlotHtml(html);
-            }, System.Windows.Threading.DispatcherPriority.Render);
+                await UpdatePlotHtmlAsync(_pendingHtml);
+                _pendingHtml = null;
+            }
+        }
+
+        private async void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ViolinPlotViewModel.PlotHtml))
+            {
+                var html = _viewModel?.PlotHtml;
+                _pendingHtml = html;
+
+                // Update immediately on UI thread
+                await Dispatcher.InvokeAsync(async () =>
+                {
+                    await EnsureWebViewAsync();
+                    await UpdatePlotHtmlAsync(html);
+                    if (IsVisible)
+                    {
+                        _pendingHtml = null;
+                    }
+                });
+            }
         }
 
         private async Task EnsureWebViewAsync()
@@ -89,27 +113,29 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             }
         }
 
-        private void UpdatePlotHtml(string? htmlContent)
+        private Task UpdatePlotHtmlAsync(string? htmlContent)
         {
             if (!_webViewInitialized || PlotWebView?.CoreWebView2 == null)
             {
-                return;
+                return Task.CompletedTask;
             }
 
             try
             {
                 if (string.IsNullOrWhiteSpace(htmlContent))
                 {
-                    PlotWebView.NavigateToString("<html><body style='font-family:Segoe UI, sans-serif;color:#666;padding:24px;'>Generate a violin plot to view results.</body></html>");
+                    PlotWebView.CoreWebView2.NavigateToString("<html><body style='font-family:Segoe UI, sans-serif;color:#666;padding:24px;'>Generate a violin plot to view results.</body></html>");
                 }
                 else
                 {
-                    PlotWebView.NavigateToString(htmlContent);
+                    PlotWebView.CoreWebView2.NavigateToString(htmlContent);
                 }
             }
             catch
             {
             }
+
+            return Task.CompletedTask;
         }
     }
 }

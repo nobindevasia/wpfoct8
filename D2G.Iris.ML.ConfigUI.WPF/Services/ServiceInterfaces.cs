@@ -37,7 +37,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
     public interface IDatabaseAnalyticsService
     {
         Task<ColumnStatistics> GetColumnStatisticsAsync(string tableName, string columnName);
-        Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null, bool includePercentiles = false);
+        Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null, bool includePercentiles = false, bool includeMoments = false);
         Task<Percentiles> GetPercentilesAsync(string tableName, string columnName);
         Task<List<HistogramBin>> GetHistogramAsync(string tableName, string columnName, int binCount = 10);
         Task<List<CategoryFrequency>> GetCategoryFrequencyAsync(string tableName, string columnName, int topN = 20);

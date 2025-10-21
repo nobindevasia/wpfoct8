@@ -285,29 +285,11 @@
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="Distribution &amp; Quality" FontWeight="SemiBold" Margin="0,0,0,10"/>
                                     <StackPanel>
-                                        <TextBlock Text="{Binding SelectedHistogram.Statistics.Skewness, StringFormat='Skewness: {0:F3}'}" Margin="0,2"/>
-                                        <TextBlock Text="{Binding SelectedHistogram.Statistics.Kurtosis, StringFormat='Kurtosis: {0:F3}'}" Margin="0,2"/>
-                                        <TextBlock Text="{Binding SelectedHistogram.Statistics.UniqueValues, StringFormat='Unique Values: {0}'}" Margin="0,2"/>
                                         <TextBlock Text="{Binding SelectedHistogram.Statistics.MissingValues, StringFormat='Missing Values: {0}'}" Margin="0,2"/>
                                         <TextBlock Text="{Binding SelectedHistogram.TotalCount, StringFormat='Total Records: {0}'}" Margin="0,2"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Grid>
-                            
-                            <!-- Most Frequent Value -->
-                            <Border Background="#FFF8F8F8" BorderBrush="LightGray" BorderThickness="1" 
-                                   CornerRadius="4" Padding="15" Margin="0,15,0,0">
-                                <StackPanel>
-                                    <TextBlock Text="Most Frequent Value" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Value: " FontWeight="Medium"/>
-                                        <TextBlock Text="{Binding SelectedHistogram.Statistics.MostFrequentValue}" FontFamily="Consolas"/>
-                                        <TextBlock Text=" (appears " Margin="10,0,0,0"/>
-                                        <TextBlock Text="{Binding SelectedHistogram.Statistics.MostFrequentCount}"/>
-                                        <TextBlock Text=" times)"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
                         </StackPanel>
                     </Border>
                 </Grid>

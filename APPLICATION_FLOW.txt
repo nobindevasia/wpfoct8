@@ -1,0 +1,133 @@
+===============================================================================
+                          D2G IRIS ML – APPLICATION FLOW
+===============================================================================
+
+1. HIGH–LEVEL OVERVIEW
+----------------------
+The WPF client follows a classic MVVM layout. A bootstrapper (App.xaml.cs)
+registers all services and view models in a .NET dependency injection container,
+creates the main window with an injected MainWindowViewModel, and leaves the
+rest of the UI to bindings and commands. Business logic is split between:
+    • ViewModels – screen state and user interaction orchestration
+    • Services    – long‑running or external work (database, ML pipeline, dialogs)
+    • Models      – configuration objects shared with the ML core libraries
+
+2. STARTUP SEQUENCE
+-------------------
+Step-by-step runtime flow:
+    1. `App.xaml` declares global resources (styles/converters) and points to
+       `App.xaml.cs` as the entry point.
+    2. `App.OnStartup` executes first. It:
+         - Sets the SciChart license.
+         - Creates a `ServiceCollection`, registering singletons for configuration,
+           SQL access, data loading/processing, ML trainers, and analytics.
+         - Registers transient view models so each window/request gets a fresh
+           instance.
+         - Builds an `IServiceProvider`.
+    3. The container resolves `MainWindowViewModel` together with its injected
+       dependencies.
+    4. `MainWindow` is constructed with the resolved view model and shown.
+    5. Control returns to WPF’s dispatcher loop; view updates now flow through
+       bindings and property notifications.
+
+3. MAIN WINDOW FLOW
+-------------------
+MainWindow.xaml
+    - Declares a TabControl containing the major configuration tabs.
+    - The window’s `DataContext` is bound to `MainWindowViewModel`.
+    - Buttons and menu items reference `ICommand` properties via bindings.
+
+MainWindowViewModel responsibilities:
+    • Bootstraps child view models (GeneralSettings, DatabaseSettings, InputFields,
+      ExploratoryDataAnalysis, DataProcessingPipeline, TrainingParameters, TrainingLogs).
+    • Exposes commands for New/Open/Save/Exit and launching training.
+    • Coordinates configuration objects (ModelConfig + nested sections).
+    • Aggregates services: loads DB schema, samples data, calls ML trainers, logs status.
+
+Property change propagation:
+    - ViewModels inherit from `BaseViewModel` (INotifyPropertyChanged).
+    - SetProperty(...) raises change notifications so any bound control updates instantly.
+    - ObservableCollection<T> is used for dynamic lists (columns, pipeline steps, etc.).
+
+4. TAB-LEVEL WORKFLOW (EXAMPLE)
+-------------------------------
+Exploratory Data Analysis tab:
+    • `ExploratoryDataAnalysisView.xaml` binds to commands (LoadData, GeneratePlots)
+      and data collections (FieldStatistics, SampleRows) on the view model.
+    • The ViewModel uses `IDatabaseAnalyticsService` to query the DB and compute stats.
+    • Chart-specific view models (e.g., ViolinPlotViewModel, BoxPlotViewModel) load
+      their own data, then expose Plotly.NET HTML strings consumed by WebView2.
+    • When the user triggers “Generate Violin Plot”, `AsyncRelayCommand` executes the
+      async workflow, updates `PlotHtml`, and the corresponding view refreshes through
+      the `PropertyChanged` event.
+
+5. DATA & COMMAND FLOW SUMMARY
+------------------------------
+    UI action (Button/ComboBox) ──› ICommand (RelayCommand/AsyncRelayCommand)
+        ──› ViewModel method (async) ──› Service layer (database/ML operations)
+        ──› ViewModel updates properties ──› PropertyChanged notification
+        ──› Bound controls refresh automatically.
+
+    - Configuration persistence uses `IConfigManager` + `ConfigurationService` to
+      serialize/deserialize `ModelConfig` structures to JSON files.
+    - Training pipeline:
+         MainWindowViewModel.LaunchTrainingCommand ›
+         Gather config ›
+         IDataLoader loads raw data ›
+         IDataProcessor applies transformations ›
+         IModelTrainerFactory creates an appropriate trainer ›
+         Trainer executes ML.NET pipeline ›
+         TrainingLogsViewModel collects status messages for the UI.
+
+6. MVVM STRUCTURE REFERENCE
+---------------------------
+    View           ViewModel                           Service/Model
+    ------------   ---------------------------------   --------------------------
+    MainWindow     MainWindowViewModel                 ModelConfig, services DI
+    GeneralSettings GeneralSettingsViewModel           ConfigurationService
+    DatabaseSettings DatabaseSettingsViewModel         IDialogService, Schema loader
+    InputFields    InputFieldsViewModel                IDialogService
+    EDA View       ExploratoryDataAnalysisViewModel    IDatabaseAnalyticsService
+    Violin Plot    ViolinPlotViewModel                 IDatabaseAnalyticsService
+    Training Params TrainingParametersViewModel        Dialog + config helpers
+    Training Logs  TrainingLogsViewModel               Log buffer (in-memory)
+
+7. BINDINGS & CONVERTERS
+------------------------
+    • Standard {Binding PropertyName} with TwoWay mode on editable input controls.
+    • Commands bound through `{Binding SomeCommand}`; buttons auto-disable when
+      `CanExecute` is false thanks to `CommandManager.InvalidateRequerySuggested`.
+    • BooleanToVisibilityConverter / InverseBooleanConverter toggle UI elements
+      (e.g., disable tabs while training).
+    • WebView2 controls load HTML from view model string properties.
+
+8. LIFECYCLE NOTES
+------------------
+    - `OnExit` disposes the ServiceProvider to release resources.
+    - View/UserControl `Loaded` handlers ensure WebView2 is initialized before
+      navigating to Plotly content.
+    - Async workflows avoid `.Result`/`.Wait()` in UI code; property updates stay
+      on the dispatcher thread so the interface remains responsive.
+
+9. EXTENDING THE APP
+--------------------
+To add a new feature screen:
+    1. Create a ViewModel derived from `BaseViewModel`.
+    2. Register it in `App.OnStartup` (services.AddTransient<...ViewModel>();).
+    3. Create the corresponding XAML view and set its DataContext through the
+       parent view model (for tabs, add a property + TabItem).
+    4. Use services injected into the view model to perform work.
+    5. Expose bindable properties and commands; wire up UI interactions in XAML.
+
+10. KEY TAKEAWAYS
+-----------------
+    • Startup is DI-first: App.xaml.cs constructs the service graph, then hands
+      execution over to MainWindow + MainWindowViewModel.
+    • MVVM separates visuals (XAML) from logic (ViewModels), relying on bindings.
+    • Commands perform all UI-initiated actions; services keep IO/ML concerns out of
+      the UI layer.
+    • Property change notifications drive the entire update cycle; no manual UI
+      refresh is needed when bindings are wired correctly.
+
+===============================================================================
+Last updated: 2025-02-14

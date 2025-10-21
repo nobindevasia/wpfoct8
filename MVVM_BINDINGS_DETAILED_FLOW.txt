@@ -1,0 +1,1627 @@
+================================================================================
+           MVVM STRUCTURE & BINDINGS - DETAILED FLOW EXPLANATION
+                    D2G IRIS ML WPF APPLICATION
+================================================================================
+
+TABLE OF CONTENTS
+=================
+1. MVVM ARCHITECTURE OVERVIEW
+2. HOW DATA BINDING WORKS (STEP-BY-STEP)
+3. COMPLETE FLOW: USER ACTION TO UI UPDATE
+4. REAL EXAMPLES FROM YOUR APPLICATION
+5. PROPERTYCHANGED MECHANISM EXPLAINED
+6. COMMAND BINDING FLOW
+7. PARENT-CHILD VIEWMODEL COMMUNICATION
+8. TWO-WAY BINDING IN ACTION
+9. COLLECTION BINDING FLOW
+10. ADVANCED BINDING SCENARIOS
+
+================================================================================
+1. MVVM ARCHITECTURE OVERVIEW
+================================================================================
+
+Let's understand the three layers with a real example from your app:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                           VIEW LAYER                                │
+│                     (GeneralSettingsView.xaml)                      │
+│                                                                     │
+│  <TextBox Text="{Binding ProjectName,                              │
+│                         Mode=TwoWay,                                │
+│                         UpdateSourceTrigger=PropertyChanged}"/>     │
+│                                                                     │
+│  This is XAML - pure UI declaration                                │
+│  No business logic here!                                           │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↕
+                      DATA BINDING MAGIC
+                              ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                        VIEWMODEL LAYER                              │
+│                  (GeneralSettingsViewModel.cs)                      │
+│                                                                     │
+│  private string _projectName;                                       │
+│  public string ProjectName                                          │
+│  {                                                                  │
+│      get => _projectName;                                           │
+│      set                                                            │
+│      {                                                              │
+│          _projectName = value;                                      │
+│          OnPropertyChanged(nameof(ProjectName));  ← NOTIFY UI!     │
+│      }                                                              │
+│  }                                                                  │
+│                                                                     │
+│  This contains properties and business logic                        │
+└─────────────────────────────────────────────────────────────────────┘
+                              ↕
+                       METHOD CALLS
+                              ↕
+┌─────────────────────────────────────────────────────────────────────┐
+│                          MODEL LAYER                                │
+│                     (Services, Data Access)                         │
+│                                                                     │
+│  ConfigurationService.SaveConfiguration(config);                    │
+│  DatabaseAnalyticsService.GetDatasetSummary();                      │
+│                                                                     │
+│  This handles data storage, database access, API calls              │
+└─────────────────────────────────────────────────────────────────────┘
+
+KEY POINT: The View never talks directly to the Model, and vice versa.
+           Everything goes through the ViewModel!
+
+================================================================================
+2. HOW DATA BINDING WORKS (STEP-BY-STEP)
+================================================================================
+
+Let's trace what happens when you type in the "Project Name" textbox:
+
+STEP 1: XAML BINDING SETUP (at startup)
+----------------------------------------
+XAML File: GeneralSettingsView.xaml
+
+    <TextBox Text="{Binding ProjectName, Mode=TwoWay}"/>
+             ↑      ↑       ↑               ↑
+             │      │       │               └─ Data flows both ways
+             │      │       └───────────────── Property name in ViewModel
+             │      └───────────────────────── Binding expression
+             └──────────────────────────────── TextBox property to bind
+
+When this XAML loads, WPF:
+1. Looks at the View's DataContext (which is GeneralSettingsViewModel)
+2. Searches for a property named "ProjectName"
+3. Creates a binding between TextBox.Text and ViewModel.ProjectName
+4. Subscribes to PropertyChanged events from the ViewModel
+
+STEP 2: INITIAL VALUE DISPLAY (View ← ViewModel)
+-------------------------------------------------
+At startup, the ViewModel might have:
+
+    public string ProjectName { get; set; } = "My ML Project";
+
+WPF automatically:
+1. Reads the ProjectName value ("My ML Project")
+2. Sets TextBox.Text = "My ML Project"
+3. Displays it in the UI
+
+YOU SEE: TextBox shows "My ML Project"
+
+STEP 3: USER TYPES IN TEXTBOX (View → ViewModel)
+-------------------------------------------------
+User types: "Customer Churn Prediction"
+
+What happens (microsecond by microsecond):
+
+1. User presses 'C' key
+   └─ TextBox.Text changes to "C"
+
+2. WPF binding system detects change (UpdateSourceTrigger=PropertyChanged)
+   └─ Immediately triggers update
+
+3. Binding calls ViewModel's ProjectName setter:
+
+   set
+   {
+       _projectName = "C";  // Stores new value
+       OnPropertyChanged(nameof(ProjectName));  // Notifies subscribers
+   }
+
+4. User continues typing...
+   Each keystroke repeats steps 1-3
+
+5. Final value: "Customer Churn Prediction"
+
+STEP 4: VIEWMODEL NOTIFIES UI (ViewModel → View)
+-------------------------------------------------
+If ViewModel changes the property programmatically:
+
+    ProjectName = "Updated by Code";
+
+The setter runs:
+
+    set
+    {
+        _projectName = "Updated by Code";
+        OnPropertyChanged(nameof(ProjectName));  ← CRITICAL!
+                          ↓
+                PropertyChanged event fired
+                          ↓
+            WPF binding system listens
+                          ↓
+                Updates TextBox.Text
+                          ↓
+            UI refreshes automatically
+    }
+
+YOU SEE: TextBox text changes to "Updated by Code"
+
+================================================================================
+3. COMPLETE FLOW: USER ACTION TO UI UPDATE
+================================================================================
+
+Let's trace a complete real-world scenario:
+"User clicks 'Test Connection' button in Database Settings"
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 1: USER CLICKS BUTTON                                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+XAML (DatabaseSettingsView.xaml):
+
+    <Button Content="Test Connection"
+            Command="{Binding TestConnectionCommand}"/>
+                     ↑
+                     └─ Binding to ICommand property
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 2: WPF CALLS COMMAND.EXECUTE()                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+ViewModel (DatabaseSettingsViewModel.cs):
+
+    public ICommand TestConnectionCommand { get; private set; }
+
+    public DatabaseSettingsViewModel()
+    {
+        // Constructor - set up command
+        TestConnectionCommand = new RelayCommand(
+            ExecuteTestConnection,  // What to do when executed
+            CanExecuteTestConnection  // When button should be enabled
+        );
+    }
+
+WPF calls:
+    TestConnectionCommand.Execute(null);
+        ↓
+    RelayCommand forwards to:
+        ↓
+    ExecuteTestConnection(null);  // Your method runs!
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 3: COMMAND METHOD EXECUTES                                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+    private async void ExecuteTestConnection(object parameter)
+    {
+        // 1. Update UI to show "Testing..."
+        ConnectionStatus = "Testing connection...";
+        IsTestingConnection = true;
+                ↓
+                PropertyChanged event fires
+                ↓
+        UI updates: Label shows "Testing..."
+                    Progress spinner appears
+
+        try
+        {
+            // 2. Call service to test connection
+            var connectionString = BuildConnectionString();
+            await _databaseService.TestConnectionAsync(connectionString);
+                    ↓
+            Service tries to connect to SQL Server
+                    ↓
+            Success!
+
+            // 3. Update UI with success message
+            ConnectionStatus = "✓ Connection successful!";
+            IsTestingConnection = false;
+                    ↓
+                    PropertyChanged events fire
+                    ↓
+            UI updates: Label shows "✓ Connection successful!" in green
+                       Progress spinner disappears
+        }
+        catch (Exception ex)
+        {
+            // 3b. Or show error
+            ConnectionStatus = $"✗ Connection failed: {ex.Message}";
+            IsTestingConnection = false;
+                    ↓
+                    PropertyChanged events fire
+                    ↓
+            UI updates: Label shows error in red
+        }
+    }
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 4: UI AUTOMATICALLY UPDATES VIA BINDINGS                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+XAML:
+    <TextBlock Text="{Binding ConnectionStatus}"
+               Foreground="{Binding ConnectionStatusColor}"/>
+
+    <ProgressBar Visibility="{Binding IsTestingConnection,
+                              Converter={StaticResource BoolToVis}}"/>
+
+Because PropertyChanged was raised:
+    - TextBlock.Text changes to "✓ Connection successful!"
+    - TextBlock.Foreground changes to Green
+    - ProgressBar.Visibility becomes Collapsed
+
+ALL AUTOMATIC - NO MANUAL UI CODE!
+
+================================================================================
+4. REAL EXAMPLES FROM YOUR APPLICATION
+================================================================================
+
+EXAMPLE 1: TRAINING PARAMETERS - ALGORITHM SELECTION
+-----------------------------------------------------
+
+XAML (TrainingParametersView.xaml):
+
+    <ComboBox ItemsSource="{Binding AvailableAlgorithms}"
+              SelectedItem="{Binding SelectedAlgorithm}"/>
+
+ViewModel (TrainingParametersViewModel.cs):
+
+    // Available options
+    public ObservableCollection<string> AvailableAlgorithms { get; } = new();
+
+    // Currently selected
+    private string _selectedAlgorithm = "fasttree";
+    public string SelectedAlgorithm
+    {
+        get => _selectedAlgorithm;
+        set
+        {
+            if (SetProperty(ref _selectedAlgorithm, value))
+            {
+                OnAlgorithmChanged();  // Load algorithm-specific parameters
+            }
+        }
+    }
+
+FLOW:
+
+1. Startup:
+   AvailableAlgorithms.Add("fasttree");
+   AvailableAlgorithms.Add("lightgbm");
+   AvailableAlgorithms.Add("sdca");
+        ↓
+   ComboBox shows: [fasttree, lightgbm, sdca]
+
+2. User selects "lightgbm":
+   ComboBox.SelectedItem = "lightgbm"
+        ↓
+   Binding updates ViewModel:
+   SelectedAlgorithm = "lightgbm"
+        ↓
+   Setter calls OnAlgorithmChanged()
+        ↓
+   Loads LightGBM-specific parameters (NumberOfLeaves, LearningRate, etc.)
+        ↓
+   Parameters collection updates
+        ↓
+   UI ListView showing parameters refreshes automatically
+
+EXAMPLE 2: AUTOML SETTINGS - ENABLE/DISABLE
+--------------------------------------------
+
+XAML (TrainingParametersView.xaml):
+
+    <RadioButton Content="Traditional Training"
+                 IsChecked="{Binding UseTraditionalTraining}"/>
+
+    <RadioButton Content="AutoML"
+                 IsChecked="{Binding UseAutoML}"/>
+
+    <GroupBox Header="Traditional Training Settings"
+              Visibility="{Binding UseTraditionalTraining,
+                          Converter={StaticResource BoolToVis}}">
+        <!-- Traditional settings here -->
+    </GroupBox>
+
+    <GroupBox Header="AutoML Settings"
+              Visibility="{Binding UseAutoML,
+                          Converter={StaticResource BoolToVis}}">
+        <!-- AutoML settings here -->
+    </GroupBox>
+
+ViewModel (TrainingParametersViewModel.cs):
+
+    private bool _useAutoML = false;
+
+    public bool UseAutoML
+    {
+        get => _useAutoML;
+        set
+        {
+            if (SetProperty(ref _useAutoML, value))
+            {
+                OnPropertyChanged(nameof(UseTraditionalTraining));
+                OnPropertyChanged(nameof(TrainingModeDescription));
+            }
+        }
+    }
+
+    public bool UseTraditionalTraining
+    {
+        get => !_useAutoML;
+        set => UseAutoML = !value;
+    }
+
+    public string TrainingModeDescription
+    {
+        get => UseAutoML
+            ? "AutoML will automatically try multiple algorithms..."
+            : "Traditional training uses the specified algorithm...";
+    }
+
+FLOW:
+
+1. User clicks "AutoML" radio button:
+   IsChecked = true
+        ↓
+   Binding sets: UseAutoML = true
+        ↓
+   Setter raises PropertyChanged for:
+   - UseAutoML
+   - UseTraditionalTraining (computed property)
+   - TrainingModeDescription (computed property)
+        ↓
+   UI updates automatically:
+   - "AutoML" radio button checked
+   - "Traditional Training" radio button unchecked
+   - Traditional GroupBox visibility → Collapsed
+   - AutoML GroupBox visibility → Visible
+   - Description text changes
+
+ALL THREE UI ELEMENTS UPDATE FROM ONE PROPERTY CHANGE!
+
+EXAMPLE 3: BOX PLOT - COLUMN SELECTION AND GENERATION
+------------------------------------------------------
+
+XAML (BoxPlotView.xaml):
+
+    <ComboBox ItemsSource="{Binding NumericColumns}"
+              SelectedItem="{Binding SelectedColumn}"/>
+
+    <Button Content="Generate Plot"
+            Command="{Binding GeneratePlotCommand}"/>
+
+    <s:SciChartSurface x:Name="BoxPlotChart"/>
+
+    <Border Visibility="{Binding IsGeneratingPlot,
+                        Converter={StaticResource BoolToVis}}">
+        <!-- Loading animation -->
+        <TextBlock Text="{Binding ProgressMessage}"/>
+    </Border>
+
+    <TextBlock Text="{Binding StatisticsInfo}"/>
+
+ViewModel (BoxPlotViewModel.cs):
+
+    // Step 1: User selects column
+    private string? _selectedColumn;
+    public string? SelectedColumn
+    {
+        get => _selectedColumn;
+        set => SetProperty(ref _selectedColumn, value);
+    }
+
+    // Step 2: User clicks "Generate Plot"
+    public ICommand GeneratePlotCommand { get; private set; }
+
+    public BoxPlotViewModel()
+    {
+        GeneratePlotCommand = new AsyncRelayCommand(
+            _ => GeneratePlotAsync(),
+            _ => CanGeneratePlot()
+        );
+    }
+
+    private bool CanGeneratePlot()
+    {
+        return !IsGeneratingPlot &&
+               !string.IsNullOrWhiteSpace(SelectedColumn);
+    }
+
+    // Step 3: Generate plot
+    private async Task GeneratePlotAsync()
+    {
+        IsGeneratingPlot = true;  // Shows loading overlay
+        ProgressMessage = "Loading statistics...";
+            ↓
+        UI updates: Loading overlay appears
+                    Progress message shows
+
+        try
+        {
+            // Fetch data from database
+            var boxPlotData = await _databaseAnalytics
+                .GetBoxPlotDataAsync(
+                    _connectionString,
+                    _tableName,
+                    SelectedColumn,
+                    _whereClause
+                );
+
+            ProgressMessage = "Rendering plot...";
+                ↓
+            UI updates: Progress message changes
+
+            // Update data
+            BoxPlotData = boxPlotData;
+                ↓
+            PropertyChanged fired
+                ↓
+            Code-behind watches this property:
+
+            // In BoxPlotView.xaml.cs:
+            _viewModel.PropertyChanged += (s, e) =>
+            {
+                if (e.PropertyName == nameof(_viewModel.BoxPlotData))
+                {
+                    UpdateBoxPlot();  // Draws chart
+                }
+            };
+
+            // Update statistics
+            StatisticsInfo = $"Min: {boxPlotData.Min} | " +
+                            $"Q1: {boxPlotData.Q1} | " +
+                            $"Median: {boxPlotData.Median} | " +
+                            $"Q3: {boxPlotData.Q3} | " +
+                            $"Max: {boxPlotData.Max}";
+                ↓
+            UI updates: Statistics bar shows values
+        }
+        finally
+        {
+            IsGeneratingPlot = false;
+            ProgressMessage = string.Empty;
+                ↓
+            UI updates: Loading overlay disappears
+        }
+    }
+
+COMPLETE FLOW:
+
+User selects "Age" column
+    ↓
+SelectedColumn = "Age"
+    ↓
+PropertyChanged fires
+    ↓
+UI updates ComboBox selection
+
+User clicks "Generate Plot"
+    ↓
+Command.Execute() called
+    ↓
+GeneratePlotAsync() runs
+    ↓
+IsGeneratingPlot = true
+    ↓
+PropertyChanged fires
+    ↓
+Loading overlay appears (binding to Visibility)
+
+Fetching data from database...
+    ↓
+BoxPlotData updated
+    ↓
+PropertyChanged fires
+    ↓
+Chart draws automatically
+
+StatisticsInfo updated
+    ↓
+PropertyChanged fires
+    ↓
+Statistics text updates
+
+IsGeneratingPlot = false
+    ↓
+PropertyChanged fires
+    ↓
+Loading overlay disappears
+
+EXAMPLE 4: TRAINING LOGS - REAL-TIME UPDATES
+---------------------------------------------
+
+XAML (TrainingLogsView.xaml):
+
+    <ListView ItemsSource="{Binding Logs}">
+        <ListView.ItemTemplate>
+            <DataTemplate>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Timestamp,
+                                     StringFormat='HH:mm:ss'}"/>
+                    <TextBlock Text="{Binding Level}"/>
+                    <TextBlock Text="{Binding Message}"/>
+                </StackPanel>
+            </DataTemplate>
+        </ListView.ItemTemplate>
+    </ListView>
+
+ViewModel (TrainingLogsViewModel.cs):
+
+    public ObservableCollection<LogEntry> Logs { get; } =
+        new ObservableCollection<LogEntry>();
+
+    public void LogMessage(string message, string level)
+    {
+        Application.Current.Dispatcher.Invoke(() =>
+        {
+            Logs.Add(new LogEntry
+            {
+                Timestamp = DateTime.Now,
+                Level = level,
+                Message = message
+            });
+        });
+    }
+
+FLOW:
+
+Training starts in MainWindowViewModel:
+    TrainingLogs.LogMessage("Starting training...", "Info");
+        ↓
+    Logs.Add(new LogEntry(...))
+        ↓
+    ObservableCollection fires CollectionChanged event
+        ↓
+    WPF binding system listens
+        ↓
+    ListView automatically adds new item to UI
+        ↓
+    DataTemplate renders: [10:30:15] [Info] Starting training...
+
+10 seconds later:
+    TrainingLogs.LogMessage("Model accuracy: 95.2%", "Success");
+        ↓
+    New item added to collection
+        ↓
+    ListView automatically updates
+        ↓
+    New row appears: [10:30:25] [Success] Model accuracy: 95.2%
+
+NO MANUAL UI UPDATE CODE - IT'S ALL AUTOMATIC!
+
+================================================================================
+5. PROPERTYCHANGED MECHANISM EXPLAINED
+================================================================================
+
+The magic behind automatic UI updates is INotifyPropertyChanged.
+
+BASE IMPLEMENTATION (BaseViewModel.cs):
+
+    public class BaseViewModel : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged(string propertyName)
+        {
+            PropertyChanged?.Invoke(this,
+                new PropertyChangedEventArgs(propertyName));
+        }
+
+        protected bool SetProperty<T>(ref T field,
+                                     T value,
+                                     [CallerMemberName] string propertyName = "")
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return false;  // No change, don't notify
+
+            field = value;  // Update backing field
+            OnPropertyChanged(propertyName);  // Notify UI
+            return true;
+        }
+    }
+
+USAGE IN CHILD VIEWMODEL:
+
+    public class GeneralSettingsViewModel : BaseViewModel
+    {
+        private string _projectName;
+
+        public string ProjectName
+        {
+            get => _projectName;
+            set => SetProperty(ref _projectName, value);
+                   ↑
+                   This does:
+                   1. Check if value changed
+                   2. Update _projectName
+                   3. Fire PropertyChanged event
+                   4. WPF bindings update UI
+        }
+    }
+
+WHAT HAPPENS UNDER THE HOOD:
+
+1. Property changes:
+   ProjectName = "New Value";
+
+2. Setter calls SetProperty:
+   SetProperty(ref _projectName, "New Value", "ProjectName");
+
+3. SetProperty checks if changed:
+   if (_projectName == "New Value") return false;  // No change
+   _projectName = "New Value";  // Update
+
+4. SetProperty fires event:
+   PropertyChanged?.Invoke(this,
+       new PropertyChangedEventArgs("ProjectName"));
+       ↑
+       This says: "Hey, ProjectName property changed!"
+
+5. WPF binding system hears event:
+   if (e.PropertyName == "ProjectName")
+   {
+       UpdateBinding();  // Refresh UI element
+   }
+
+6. UI element updates:
+   TextBox.Text = viewModel.ProjectName;  // "New Value"
+
+VISUAL FLOW:
+
+    ViewModel                          WPF Binding System
+    ─────────                          ──────────────────
+
+    ProjectName = "X"
+        ↓
+    SetProperty(...)
+        ↓
+    _projectName = "X"
+        ↓
+    PropertyChanged?.Invoke(...)
+        ↓
+        ────────────────────────────→ Event received
+                                          ↓
+                                      Check property name
+                                          ↓
+                                      Find bound controls
+                                          ↓
+                                      Update TextBox.Text
+                                          ↓
+                                      User sees "X"
+
+MULTIPLE NOTIFICATIONS:
+
+Sometimes changing one property affects others:
+
+    public bool UseAutoML
+    {
+        get => _useAutoML;
+        set
+        {
+            if (SetProperty(ref _useAutoML, value))
+            {
+                // This property changed
+
+                OnPropertyChanged(nameof(UseTraditionalTraining));
+                // Notify dependent property 1
+
+                OnPropertyChanged(nameof(TrainingModeDescription));
+                // Notify dependent property 2
+            }
+        }
+    }
+
+WPF receives THREE PropertyChanged events:
+1. "UseAutoML" → Updates AutoML radio button
+2. "UseTraditionalTraining" → Updates Traditional radio button
+3. "TrainingModeDescription" → Updates description text
+
+ALL THREE UI ELEMENTS UPDATE FROM ONE USER ACTION!
+
+================================================================================
+6. COMMAND BINDING FLOW
+================================================================================
+
+Commands connect user actions (clicks) to ViewModel methods.
+
+SETUP PHASE (in ViewModel constructor):
+
+    public class DatabaseSettingsViewModel : BaseViewModel
+    {
+        public ICommand TestConnectionCommand { get; private set; }
+        public ICommand BrowseDatabaseCommand { get; private set; }
+
+        public DatabaseSettingsViewModel(IDialogService dialogService)
+        {
+            _dialogService = dialogService;
+
+            // Create commands
+            TestConnectionCommand = new RelayCommand(
+                execute: ExecuteTestConnection,
+                canExecute: CanExecuteTestConnection
+            );
+
+            BrowseDatabaseCommand = new RelayCommand(
+                execute: ExecuteBrowseDatabase,
+                canExecute: _ => true  // Always enabled
+            );
+        }
+    }
+
+XAML BINDING:
+
+    <Button Content="Test Connection"
+            Command="{Binding TestConnectionCommand}"/>
+                     ↑
+                     Binding to ICommand property
+
+EXECUTION FLOW:
+
+1. WPF checks CanExecute:
+   TestConnectionCommand.CanExecute(null)
+       ↓
+   RelayCommand calls: CanExecuteTestConnection(null)
+       ↓
+   private bool CanExecuteTestConnection(object param)
+   {
+       return !string.IsNullOrEmpty(ServerName) &&
+              !string.IsNullOrEmpty(DatabaseName) &&
+              !IsTestingConnection;
+   }
+       ↓
+   Returns true → Button.IsEnabled = true
+   Returns false → Button.IsEnabled = false
+
+2. User clicks button:
+   Button fires Command
+       ↓
+   TestConnectionCommand.Execute(null)
+       ↓
+   RelayCommand calls: ExecuteTestConnection(null)
+       ↓
+   private async void ExecuteTestConnection(object param)
+   {
+       // Your business logic here
+       IsTestingConnection = true;  // Disables button
+       await TestAsync();
+       IsTestingConnection = false;  // Re-enables button
+   }
+
+RELAYCOMMAND IMPLEMENTATION:
+
+    public class RelayCommand : ICommand
+    {
+        private readonly Action<object> _execute;
+        private readonly Func<object, bool> _canExecute;
+
+        public RelayCommand(Action<object> execute,
+                           Func<object, bool> canExecute = null)
+        {
+            _execute = execute;
+            _canExecute = canExecute;
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return _canExecute == null || _canExecute(parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            _execute(parameter);
+        }
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+    }
+
+CANEXECUTE REFRESH:
+
+WPF automatically re-evaluates CanExecute when:
+- User interacts with UI
+- Focus changes
+- Property values change
+
+You can force refresh:
+    CommandManager.InvalidateRequerySuggested();
+
+EXAMPLE WITH PARAMETER:
+
+XAML:
+    <Button Content="Delete"
+            Command="{Binding DeleteCommand}"
+            CommandParameter="{Binding SelectedItem}"/>
+
+ViewModel:
+    DeleteCommand = new RelayCommand(
+        execute: item => DeleteItem((DataItem)item),
+        canExecute: item => item != null
+    );
+
+================================================================================
+7. PARENT-CHILD VIEWMODEL COMMUNICATION
+================================================================================
+
+Your app has a hierarchical ViewModel structure:
+
+    MainWindowViewModel (Parent)
+        ├── GeneralSettingsViewModel
+        ├── DatabaseSettingsViewModel
+        ├── InputFieldsViewModel
+        ├── TrainingParametersViewModel
+        └── ExploratoryDataAnalysisViewModel (Parent)
+                ├── BoxPlotViewModel
+                ├── ViolinPlotViewModel
+                └── OutlierDetectionViewModel
+
+PARENT CREATES CHILDREN (MainWindowViewModel.cs):
+
+    public class MainWindowViewModel : BaseViewModel
+    {
+        // Child ViewModels as properties
+        public GeneralSettingsViewModel GeneralSettings { get; }
+        public DatabaseSettingsViewModel DatabaseSettings { get; }
+        public TrainingParametersViewModel TrainingParameters { get; }
+
+        public MainWindowViewModel(IDialogService dialogService,
+                                  IConfigurationService configService)
+        {
+            _dialogService = dialogService;
+            _configService = configService;
+
+            // Instantiate children
+            GeneralSettings = new GeneralSettingsViewModel(dialogService);
+            DatabaseSettings = new DatabaseSettingsViewModel(dialogService);
+            TrainingParameters = new TrainingParametersViewModel(dialogService);
+        }
+    }
+
+XAML SETS DATACONTEXT (MainWindow.xaml):
+
+    <Window DataContext="{Binding RelativeSource={RelativeSource Self},
+                                 Path=ViewModel}">
+        <!-- This window's DataContext = MainWindowViewModel -->
+
+        <TabControl>
+            <TabItem Header="General Settings">
+                <views:GeneralSettingsView
+                    DataContext="{Binding GeneralSettings}"/>
+                                 ↑
+                                 Child ViewModel
+            </TabItem>
+
+            <TabItem Header="Database Settings">
+                <views:DatabaseSettingsView
+                    DataContext="{Binding DatabaseSettings}"/>
+            </TabItem>
+        </TabControl>
+    </Window>
+
+DATACONTEXT HIERARCHY:
+
+    Window
+    ├─ DataContext = MainWindowViewModel
+    │
+    ├─ TabControl
+    │  ├─ DataContext = MainWindowViewModel (inherited)
+    │  │
+    │  ├─ GeneralSettingsView
+    │  │  └─ DataContext = GeneralSettingsViewModel (explicit)
+    │  │     └─ Bindings look here for properties
+    │  │
+    │  └─ DatabaseSettingsView
+    │     └─ DataContext = DatabaseSettingsViewModel (explicit)
+    │        └─ Bindings look here for properties
+
+PARENT CALLS CHILD METHODS:
+
+When "Start Training" button clicked:
+
+    private async void ExecuteStartTraining(object parameter)
+    {
+        // 1. Get configuration from all child ViewModels
+        var generalConfig = GeneralSettings.GetConfiguration();
+        var databaseConfig = DatabaseSettings.GetConfiguration();
+        var (trainingParams, autoMLConfig, modelType, targetField) =
+            TrainingParameters.GetConfiguration();
+
+        // 2. Pass data to child ViewModels
+        ExploratoryDataAnalysis.SetDatabaseConnection(
+            databaseConfig.ConnectionString,
+            databaseConfig.TableName,
+            enabledFields,
+            whereClause
+        );
+
+        // 3. Child ViewModels initialize their children
+        // ExploratoryDataAnalysisViewModel initializes:
+        _boxPlotViewModel.SetDatabaseConnection(...);
+        _violinPlotViewModel.SetDatabaseConnection(...);
+    }
+
+CHILD NOTIFIES PARENT (Event Pattern):
+
+Child ViewModel:
+    public class InputFieldsViewModel : BaseViewModel
+    {
+        public event Action<string> TargetFieldChanged;
+
+        public string TargetField
+        {
+            get => _targetField;
+            set
+            {
+                if (SetProperty(ref _targetField, value))
+                {
+                    TargetFieldChanged?.Invoke(value);
+                }
+            }
+        }
+    }
+
+Parent subscribes:
+    public MainWindowViewModel()
+    {
+        InputFields.TargetFieldChanged += OnTargetFieldChanged;
+    }
+
+    private void OnTargetFieldChanged(string newTargetField)
+    {
+        // Update other ViewModels
+        TrainingParameters.SetTargetField(newTargetField);
+        ExploratoryDataAnalysis.UpdateTargetField(newTargetField);
+    }
+
+FLOW:
+
+User selects target field in InputFieldsView
+    ↓
+InputFieldsViewModel.TargetField = "Purchased"
+    ↓
+PropertyChanged fires (UI updates)
+    ↓
+TargetFieldChanged event fires
+    ↓
+MainWindowViewModel.OnTargetFieldChanged("Purchased")
+    ↓
+TrainingParameters.SetTargetField("Purchased")
+    ↓
+ExploratoryDataAnalysis.UpdateTargetField("Purchased")
+    ↓
+Multiple child ViewModels updated from one change!
+
+================================================================================
+8. TWO-WAY BINDING IN ACTION
+================================================================================
+
+Two-way binding means data flows BOTH directions:
+- View → ViewModel (user input)
+- ViewModel → View (programmatic changes)
+
+EXAMPLE: MAX EXPERIMENT TIME IN AUTOML
+
+XAML (TrainingParametersView.xaml):
+
+    <TextBox Text="{Binding MaxExperimentTimeInSeconds,
+                            Mode=TwoWay,
+                            UpdateSourceTrigger=PropertyChanged,
+                            Converter={StaticResource StringToIntConverter}}"/>
+
+ViewModel (TrainingParametersViewModel.cs):
+
+    private int _maxExperimentTimeInSeconds = 30;
+
+    public int MaxExperimentTimeInSeconds
+    {
+        get => _maxExperimentTimeInSeconds;
+        set => SetProperty(ref _maxExperimentTimeInSeconds,
+                          Math.Max(1, Math.Min(3600, value)));
+                          ↑
+                          Validates: must be between 1 and 3600
+    }
+
+FLOW SCENARIO 1: USER TYPES
+----------------------------
+
+1. TextBox shows "30"
+2. User types "120"
+3. Each keystroke:
+
+   User types '1':
+   TextBox.Text = "1"
+       ↓
+   Converter: string "1" → int 1
+       ↓
+   MaxExperimentTimeInSeconds = 1
+       ↓
+   Setter validates: Math.Max(1, Math.Min(3600, 1)) = 1
+       ↓
+   PropertyChanged fires
+       ↓
+   Binding updates TextBox
+       ↓
+   Converter: int 1 → string "1"
+       ↓
+   TextBox.Text = "1"
+
+   User types '2':
+   TextBox.Text = "12"
+       ↓
+   (repeat process)
+       ↓
+   Final: MaxExperimentTimeInSeconds = 12
+
+   User types '0':
+   TextBox.Text = "120"
+       ↓
+   MaxExperimentTimeInSeconds = 120
+
+FLOW SCENARIO 2: USER TYPES INVALID VALUE
+------------------------------------------
+
+1. User types "5000" (exceeds max of 3600)
+2. Each keystroke until "5000"
+3. Final update:
+
+   TextBox.Text = "5000"
+       ↓
+   Converter: string "5000" → int 5000
+       ↓
+   MaxExperimentTimeInSeconds = 5000
+       ↓
+   Setter validates: Math.Max(1, Math.Min(3600, 5000)) = 3600
+       ↓
+   _maxExperimentTimeInSeconds = 3600  (CLAMPED!)
+       ↓
+   PropertyChanged fires
+       ↓
+   Binding updates TextBox
+       ↓
+   Converter: int 3600 → string "3600"
+       ↓
+   TextBox.Text = "3600"
+
+USER SEES: Their input "5000" immediately changes to "3600"
+
+FLOW SCENARIO 3: CODE SETS VALUE
+---------------------------------
+
+Loading configuration:
+
+    public void LoadConfiguration(AutoMLConfig config)
+    {
+        MaxExperimentTimeInSeconds = config.MaxTime; // e.g., 60
+            ↓
+        Setter: _maxExperimentTimeInSeconds = 60
+            ↓
+        PropertyChanged fires
+            ↓
+        Binding updates TextBox
+            ↓
+        Converter: int 60 → string "60"
+            ↓
+        TextBox.Text = "60"
+
+USER SEES: TextBox updates to "60"
+
+UPDATEDSOURCETRIGGER OPTIONS:
+
+1. PropertyChanged (our choice):
+   - Updates on every keystroke
+   - Immediate validation
+   - Real-time feedback
+
+2. LostFocus:
+   - Updates when user tabs away
+   - Less frequent updates
+   - Better performance for complex validation
+
+3. Explicit:
+   - Only updates when you call UpdateSource()
+   - Full manual control
+
+================================================================================
+9. COLLECTION BINDING FLOW
+================================================================================
+
+Collections need special handling for UI updates.
+
+WRONG WAY (List<T>):
+
+    public List<string> Items { get; set; } = new List<string>();
+
+    public void AddItem(string item)
+    {
+        Items.Add(item);
+        // UI DOES NOT UPDATE! ❌
+    }
+
+Problem: List<T> doesn't notify UI of changes
+
+RIGHT WAY (ObservableCollection<T>):
+
+    public ObservableCollection<string> Items { get; } =
+        new ObservableCollection<string>();
+
+    public void AddItem(string item)
+    {
+        Items.Add(item);
+        // UI UPDATES AUTOMATICALLY! ✓
+    }
+
+EXAMPLE: PARAMETER LIST IN TRAINING PARAMETERS
+
+XAML (TrainingParametersView.xaml):
+
+    <ListView ItemsSource="{Binding Parameters}">
+        <ListView.View>
+            <GridView>
+                <GridViewColumn Header="Name"
+                               DisplayMemberBinding="{Binding Name}"/>
+                <GridViewColumn Header="Value"
+                               DisplayMemberBinding="{Binding ValueString}"/>
+            </GridView>
+        </ListView.View>
+    </ListView>
+
+    <Button Content="Add Parameter"
+            Command="{Binding AddParameterCommand}"/>
+
+ViewModel (TrainingParametersViewModel.cs):
+
+    public ObservableCollection<ParameterItem> Parameters { get; } =
+        new ObservableCollection<ParameterItem>();
+
+    public ICommand AddParameterCommand { get; private set; }
+
+    private void ExecuteAddParameter(object param)
+    {
+        // Show dialog to get parameter details
+        var dialog = new ParameterDialog();
+        if (dialog.ShowDialog() == true)
+        {
+            var newParam = new ParameterItem
+            {
+                Name = dialog.ParameterName,
+                ValueString = dialog.ParameterValue
+            };
+
+            Parameters.Add(newParam);
+            ↑
+            ObservableCollection fires CollectionChanged event
+            ↓
+            WPF binding system listens
+            ↓
+            ListView adds new row automatically
+            ↓
+            User sees new parameter in list
+        }
+    }
+
+OBSERVABLECOLLECTION EVENTS:
+
+When you add/remove items:
+
+    Parameters.Add(item);
+        ↓
+    CollectionChanged event fired:
+    {
+        Action: Add,
+        NewItems: [item],
+        NewStartingIndex: 5
+    }
+        ↓
+    ListView.ItemsSource binding hears event
+        ↓
+    ListView creates new row at index 5
+        ↓
+    DataTemplate renders item
+
+When you remove:
+
+    Parameters.RemoveAt(3);
+        ↓
+    CollectionChanged event fired:
+    {
+        Action: Remove,
+        OldItems: [removed item],
+        OldStartingIndex: 3
+    }
+        ↓
+    ListView removes row at index 3
+
+When you clear:
+
+    Parameters.Clear();
+        ↓
+    CollectionChanged event: Action = Reset
+        ↓
+    ListView clears all rows
+
+NESTED OBJECT UPDATES:
+
+ObservableCollection notifies when collection changes (add/remove),
+but NOT when individual items change.
+
+For item updates to reflect:
+
+    public class ParameterItem : INotifyPropertyChanged
+    {
+        private string _valueString;
+
+        public string ValueString
+        {
+            get => _valueString;
+            set
+            {
+                _valueString = value;
+                OnPropertyChanged(nameof(ValueString));
+                ↑
+                This updates the ListView cell!
+            }
+        }
+    }
+
+COMPLETE FLOW:
+
+User edits parameter value in ListView:
+
+    ListView cell TextBox loses focus
+        ↓
+    Binding updates: ParameterItem.ValueString = "new value"
+        ↓
+    ParameterItem raises PropertyChanged
+        ↓
+    ListView cell TextBlock updates
+        ↓
+    User sees changed value
+
+Later, user clicks "Add Parameter":
+
+    AddParameterCommand executes
+        ↓
+    Parameters.Add(newParam)
+        ↓
+    CollectionChanged fires
+        ↓
+    ListView adds new row
+        ↓
+    User sees new parameter
+
+BINDING TO NESTED COLLECTIONS:
+
+XAML:
+    <ComboBox ItemsSource="{Binding AvailableAlgorithms}"
+              SelectedItem="{Binding SelectedAlgorithm}"/>
+
+    <ListView ItemsSource="{Binding Parameters}">
+        <!-- Parameters for selected algorithm -->
+    </ListView>
+
+ViewModel:
+    private string _selectedAlgorithm;
+    public string SelectedAlgorithm
+    {
+        get => _selectedAlgorithm;
+        set
+        {
+            if (SetProperty(ref _selectedAlgorithm, value))
+            {
+                LoadAlgorithmParameters();
+                ↓
+                Updates Parameters collection
+            }
+        }
+    }
+
+    private void LoadAlgorithmParameters()
+    {
+        Parameters.Clear();  // Clear old parameters
+
+        switch (SelectedAlgorithm)
+        {
+            case "fasttree":
+                Parameters.Add(new ParameterItem("NumberOfTrees", "100"));
+                Parameters.Add(new ParameterItem("MinDocuments", "10"));
+                break;
+
+            case "lightgbm":
+                Parameters.Add(new ParameterItem("NumberOfLeaves", "31"));
+                Parameters.Add(new ParameterItem("LearningRate", "0.1"));
+                break;
+        }
+        ↓
+        Each Add() fires CollectionChanged
+        ↓
+        ListView rebuilds with new parameters
+    }
+
+Flow:
+    User selects "lightgbm"
+        ↓
+    SelectedAlgorithm = "lightgbm"
+        ↓
+    LoadAlgorithmParameters()
+        ↓
+    Parameters.Clear() → ListView empties
+        ↓
+    Parameters.Add(...) → ListView shows "NumberOfLeaves"
+        ↓
+    Parameters.Add(...) → ListView shows "LearningRate"
+        ↓
+    User sees LightGBM-specific parameters!
+
+================================================================================
+10. ADVANCED BINDING SCENARIOS
+================================================================================
+
+SCENARIO 1: MULTI-TRIGGER VISIBILITY
+-------------------------------------
+
+Show AutoML settings ONLY when:
+- UseAutoML is true
+- AND ModelType is selected
+
+XAML:
+    <GroupBox Header="AutoML Settings">
+        <GroupBox.Style>
+            <Style TargetType="GroupBox">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                    <MultiDataTrigger>
+                        <MultiDataTrigger.Conditions>
+                            <Condition Binding="{Binding UseAutoML}"
+                                      Value="True"/>
+                            <Condition Binding="{Binding ModelType}"
+                                      Value="{x:Null}"
+                                      Invert="True"/>
+                        </MultiDataTrigger.Conditions>
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </MultiDataTrigger>
+                </Style.Triggers>
+            </Style>
+        </GroupBox.Style>
+    </GroupBox>
+
+ViewModel:
+    // Both properties notify when changed
+    public bool UseAutoML { get; set; }
+    public ModelType? ModelType { get; set; }
+
+Flow:
+    UseAutoML = true
+        ↓
+    PropertyChanged fires
+        ↓
+    WPF checks both conditions
+        ↓
+    UseAutoML = true ✓
+    ModelType != null ? Check...
+        ↓
+    If both true: Visibility = Visible
+    Otherwise: Visibility = Collapsed
+
+SCENARIO 2: COMPUTED PROPERTIES
+--------------------------------
+
+Display formatted text based on multiple properties:
+
+ViewModel:
+    private int _numberOfRows;
+    public int NumberOfRows
+    {
+        get => _numberOfRows;
+        set
+        {
+            if (SetProperty(ref _numberOfRows, value))
+            {
+                OnPropertyChanged(nameof(DatasetSummary));
+            }
+        }
+    }
+
+    private int _numberOfColumns;
+    public int NumberOfColumns
+    {
+        get => _numberOfColumns;
+        set
+        {
+            if (SetProperty(ref _numberOfColumns, value))
+            {
+                OnPropertyChanged(nameof(DatasetSummary));
+            }
+        }
+    }
+
+    public string DatasetSummary =>
+        $"Dataset: {NumberOfRows:N0} rows × {NumberOfColumns} columns";
+        ↑
+        Computed from other properties
+
+XAML:
+    <TextBlock Text="{Binding DatasetSummary}"/>
+
+Flow:
+    NumberOfRows = 10000
+        ↓
+    PropertyChanged("NumberOfRows")
+    PropertyChanged("DatasetSummary")
+        ↓
+    TextBlock updates: "Dataset: 10,000 rows × 0 columns"
+
+    NumberOfColumns = 15
+        ↓
+    PropertyChanged("NumberOfColumns")
+    PropertyChanged("DatasetSummary")
+        ↓
+    TextBlock updates: "Dataset: 10,000 rows × 15 columns"
+
+SCENARIO 3: BINDING TO METHODS (via Converter)
+-----------------------------------------------
+
+Sometimes you need to call a method with a parameter:
+
+ViewModel:
+    public Brush GetStatusBrush(string status)
+    {
+        return status switch
+        {
+            "Success" => Brushes.Green,
+            "Warning" => Brushes.Orange,
+            "Error" => Brushes.Red,
+            _ => Brushes.Gray
+        };
+    }
+
+Converter:
+    public class StatusToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, ...)
+        {
+            var viewModel = // Get ViewModel reference
+            return viewModel.GetStatusBrush((string)value);
+        }
+    }
+
+XAML:
+    <TextBlock Foreground="{Binding ConnectionStatus,
+                           Converter={StaticResource StatusToBrush}}"/>
+
+SCENARIO 4: BINDING PATH TRAVERSAL
+-----------------------------------
+
+Access nested properties:
+
+ViewModel hierarchy:
+    MainWindowViewModel
+        └── DatabaseSettings
+                └── ServerName
+
+XAML (from MainWindow context):
+    <TextBlock Text="{Binding DatabaseSettings.ServerName}"/>
+                              ↑
+                              Traverses object graph
+
+Flow:
+    Binding looks at MainWindowViewModel
+        ↓
+    Finds DatabaseSettings property
+        ↓
+    Gets DatabaseSettingsViewModel
+        ↓
+    Finds ServerName property
+        ↓
+    Gets value "localhost"
+        ↓
+    TextBlock.Text = "localhost"
+
+If ServerName changes:
+    DatabaseSettingsViewModel.ServerName = "newserver"
+        ↓
+    PropertyChanged("ServerName") fires
+        ↓
+    Binding detects change in nested path
+        ↓
+    TextBlock.Text = "newserver"
+
+SCENARIO 5: COMMAND PARAMETER BINDING
+--------------------------------------
+
+Pass runtime data to commands:
+
+XAML:
+    <ListView ItemsSource="{Binding Items}"
+              SelectedItem="{Binding SelectedItem}">
+        <ListView.ItemTemplate>
+            <DataTemplate>
+                <StackPanel>
+                    <TextBlock Text="{Binding Name}"/>
+                    <Button Content="Delete"
+                            Command="{Binding DataContext.DeleteCommand,
+                                     RelativeSource={RelativeSource
+                                         AncestorType=ListView}}"
+                            CommandParameter="{Binding}"/>
+                            ↑                           ↑
+                            Command from ListView       Current item
+                            DataContext (ViewModel)
+                </StackPanel>
+            </DataTemplate>
+        </ListView.ItemTemplate>
+    </ListView>
+
+ViewModel:
+    public ICommand DeleteCommand { get; private set; }
+
+    DeleteCommand = new RelayCommand(
+        execute: item => DeleteItem((DataItem)item),
+        canExecute: item => item != null
+    );
+
+    private void DeleteItem(DataItem item)
+    {
+        Items.Remove(item);
+        ↓
+        ObservableCollection notifies
+        ↓
+        ListView removes row
+    }
+
+Flow:
+    User clicks "Delete" button on row 3
+        ↓
+    CommandParameter = Items[3] (DataItem object)
+        ↓
+    DeleteCommand.Execute(Items[3])
+        ↓
+    DeleteItem(Items[3]) called
+        ↓
+    Items.Remove(Items[3])
+        ↓
+    CollectionChanged fires
+        ↓
+    ListView removes row 3
+
+================================================================================
+END OF DETAILED FLOW EXPLANATION
+================================================================================
+
+KEY TAKEAWAYS:
+
+1. BINDING IS AUTOMATIC
+   - No manual UI update code needed
+   - PropertyChanged makes it happen
+
+2. DATACONTEXT IS KING
+   - All bindings look at DataContext
+   - Hierarchical structure flows down
+
+3. OBSERVABLECOLLECTION FOR LISTS
+   - List<T> won't update UI
+   - ObservableCollection<T> does
+
+4. COMMANDS DECOUPLE UI FROM LOGIC
+   - Button knows nothing about business logic
+   - ViewModel handles everything
+
+5. TWO-WAY BINDING FLOWS BOTH WAYS
+   - User input → ViewModel
+   - Code changes → UI
+
+6. COMPUTED PROPERTIES REDUCE DUPLICATION
+   - One property depends on others
+   - Notify both when base changes
+
+This is the MAGIC of MVVM!
+Everything updates automatically through bindings.

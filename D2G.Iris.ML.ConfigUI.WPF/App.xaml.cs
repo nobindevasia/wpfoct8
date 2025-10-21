@@ -45,15 +45,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<DatabaseSettingsViewModel>();
             services.AddTransient<InputFieldsViewModel>();
             services.AddTransient<TrainingParametersViewModel>();
-
             services.AddTransient<DataBalancingViewModel>();
             services.AddTransient<FeatureEngineeringViewModel>();
             services.AddTransient<AutoMLSettingsViewModel>();
-
             services.AddTransient<ExploratoryDataAnalysisViewModel>();
-            services.AddTransient<VisualisationViewModel>();
-            services.AddTransient<OutlierDetectionViewModel>();
-
             services.AddTransient<TrainingLogsViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();

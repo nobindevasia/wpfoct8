@@ -39,10 +39,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             SelectHistogramCommand = new AsyncRelayCommand(async obj => await SelectHistogramAsync(obj as HistogramViewModel));
             BackToOverviewCommand = new RelayCommand(_ => BackToOverview());
             CancelGenerationCommand = new RelayCommand(_ => CancelGeneration());
-            GenerateHistogramsCommand = new AsyncRelayCommand(async _ => {
-                Console.WriteLine("=== GenerateHistogramsCommand executed ===");
-                await GenerateHistogramsAsync();
-            }, _ => CanGenerateHistograms());
+            GenerateHistogramsCommand = new AsyncRelayCommand(async _ => await GenerateHistogramsAsync(), _ => CanGenerateHistograms());
         }
 
         #region Properties
@@ -94,36 +91,20 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public void SetDatabaseConnection(string connectionString, string tableName, string[] columns, string? whereClause = null)
         {
-            Console.WriteLine($"=== SetDatabaseConnection called ===");
-            Console.WriteLine($"ConnectionString: {connectionString?.Length} chars");
-            Console.WriteLine($"TableName: {tableName}");
-            Console.WriteLine($"Columns: {columns?.Length ?? 0} columns");
-            if (columns != null && columns.Length > 0)
-            {
-                Console.WriteLine($"Column names: {string.Join(", ", columns)}");
-            }
-
             _connectionString = connectionString;
             _tableName = tableName;
             _columns = columns;
             _whereClause = whereClause;
             UpdateDataInfo();
-
-            Console.WriteLine($"CanGenerateHistograms: {CanGenerateHistograms()}");
         }
 
         public async Task GenerateHistogramPreviewsAsync()
         {
-            Console.WriteLine("=== Starting GenerateHistogramPreviewsAsync ===");
-
             if (string.IsNullOrEmpty(_connectionString) || string.IsNullOrEmpty(_tableName) || _columns == null)
             {
-                Console.WriteLine("✗ Database connection not configured");
                 _dialogService.ShowErrorDialog("Database connection not configured.", "Configuration Error");
                 return;
             }
-
-            Console.WriteLine($"✓ Configuration: Table={_tableName}, Columns={_columns?.Length}");
 
             _cancellationTokenSource?.Cancel();
             _cancellationTokenSource = new CancellationTokenSource();
@@ -135,20 +116,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 ProgressMessage = "Getting table schema...";
-                Console.WriteLine("Retrieving table schema...");
                 var schema = await _databaseAnalytics.GetTableSchemaAsync(_connectionString, _tableName);
-                Console.WriteLine($"✓ Schema retrieved: {schema.Count} columns found");
-                Console.WriteLine($"Schema columns: {string.Join(", ", schema.Select(s => s.ColumnName))}");
-                Console.WriteLine($"Requested columns: {string.Join(", ", _columns)}");
 
                 var availableColumns = _columns.Where(col => schema.Any(s => s.ColumnName.Equals(col, StringComparison.OrdinalIgnoreCase))).ToArray();
-                Console.WriteLine($"✓ Available columns after matching: {string.Join(", ", availableColumns)}");
 
                 if (!availableColumns.Any())
                 {
-                    Console.WriteLine("✗ ERROR: No columns matched between requested columns and schema!");
-                    Console.WriteLine($"✗ Requested: [{string.Join("], [", _columns)}]");
-                    Console.WriteLine($"✗ Schema has: [{string.Join("], [", schema.Select(s => s.ColumnName))}]");
                     _dialogService.ShowErrorDialog(
                         $"No valid columns found for visualization.\n\n" +
                         $"Requested {_columns.Length} columns but none exist in table '{_tableName}'.\n" +
@@ -173,7 +146,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         if (IsNumericType(columnSchema.DataType))
                         {
                             numericColumns.Add(column);
-                            Console.WriteLine($"Added numeric column: {column} (Type: {columnSchema.DataType})");
                         }
                         else if (IsTextType(columnSchema.DataType))
                         {
@@ -185,35 +157,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 var totalColumns = numericColumns.Count + categoricalColumns.Count;
                 var processedColumns = 0;
 
-                Console.WriteLine($"Starting to process {numericColumns.Count} numeric columns");
                 foreach (var column in numericColumns)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     processedColumns++;
                     ProgressMessage = $"Generating histogram for {column} ({processedColumns}/{totalColumns})...";
-                    Console.WriteLine($"Processing column: {column}");
 
-                    try
+                    var histogram = await CreateNumericHistogramAsync(column, cancellationToken);
+                    if (histogram != null)
                     {
-                        var histogram = await CreateNumericHistogramAsync(column, cancellationToken);
-                        if (histogram != null)
-                        {
-                            Histograms.Add(histogram);
-                            Console.WriteLine($"✓ Successfully created histogram for {column}");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"✗ Failed to create histogram for {column} (returned null)");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"✗ Exception while processing {column}: {ex.GetType().Name} - {ex.Message}");
-                        if (ex.InnerException != null)
-                        {
-                            Console.WriteLine($"  Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
-                        }
+                        Histograms.Add(histogram);
                     }
 
                     await Task.Delay(50, cancellationToken);
@@ -265,21 +219,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public async Task GenerateHistogramsAsync()
         {
-            Console.WriteLine("=== GenerateHistogramsAsync called ===");
-            try
-            {
-                await GenerateHistogramPreviewsAsync();
-                Console.WriteLine("=== GenerateHistogramPreviewsAsync completed ===");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"=== Exception in GenerateHistogramsAsync: {ex.GetType().Name} - {ex.Message} ===");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"=== Inner: {ex.InnerException.GetType().Name} - {ex.InnerException.Message} ===");
-                }
-                throw;
-            }
+            await GenerateHistogramPreviewsAsync();
         }
 
         #endregion
@@ -363,13 +303,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 if (!histogramData.Any())
                 {
-                    Console.WriteLine($"No histogram data returned for column: {columnName}");
-
-                    var debugInfo = await _databaseAnalytics.DebugBasicOperationsAsync(
-                        _connectionString!, _tableName!, columnName);
-                    Console.WriteLine($"Debug info for {columnName}:");
-                    Console.WriteLine(debugInfo);
-
                     return null;
                 }
 
@@ -390,7 +323,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 }
 
                 var columnStats = await GetColumnStatisticsAsync(columnName);
-                var statistics = CreateNumericStatisticalSummary(columnStats, histogramData.Sum(h => h.Count));
+                var statistics = CreateNumericStatisticalSummary(columnStats);
 
                 return new HistogramViewModel
                 {
@@ -403,13 +336,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     IsPreviewOnly = false
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error creating numeric histogram for {columnName}: {ex.GetType().Name} - {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"Inner exception: {ex.InnerException.GetType().Name} - {ex.InnerException.Message}");
-                }
                 return null;
             }
         }
@@ -456,9 +384,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     IsPreviewOnly = false
                 };
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"Error creating categorical histogram for {columnName}: {ex.Message}");
                 return null;
             }
         }
@@ -468,7 +395,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 var stats = await _databaseAnalytics.GetColumnStatisticsAsync(
-                    _connectionString!, _tableName!, new[] { columnName }, _whereClause);
+                    _connectionString!, _tableName!, new[] { columnName }, _whereClause,
+                    includePercentiles: true, includeMoments: false);
                 return stats.FirstOrDefault();
             }
             catch
@@ -477,45 +405,39 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        private StatisticalSummary CreateNumericStatisticalSummary(ColumnStatistics? columnStats, long totalCount)
+        private StatisticalSummary CreateNumericStatisticalSummary(ColumnStatistics? columnStats)
         {
             if (columnStats == null)
             {
                 return new StatisticalSummary();
             }
 
+            var q1 = columnStats.Q1;
+            var q3 = columnStats.Q3;
+            var median = columnStats.Median;
+            var missingValues = columnStats.Count - columnStats.NonNullCount;
+
             return new StatisticalSummary
             {
                 Mean = columnStats.Mean ?? 0,
-                Median = 0,
+                Median = median,
                 StandardDeviation = columnStats.StandardDeviation ?? 0,
                 Variance = columnStats.Variance ?? 0,
                 Min = columnStats.Min ?? 0,
                 Max = columnStats.Max ?? 0,
                 Range = (columnStats.Max ?? 0) - (columnStats.Min ?? 0),
-                Q1 = 0,
-                Q3 = 0,
-                IQR = 0,
-                Skewness = 0,
-                Kurtosis = 0,
-                UniqueValues = (int)(columnStats.UniqueCount ?? 0),
-                MissingValues = 0,
-                MostFrequentValue = "",
-                MostFrequentCount = 0
+                Q1 = q1,
+                Q3 = q3,
+                IQR = q3 - q1,
+                MissingValues = missingValues
             };
         }
 
         private StatisticalSummary CreateCategoricalStatisticalSummary(List<CategoryFrequency> categoryData)
         {
-            var mostFrequent = categoryData.FirstOrDefault();
-            var totalCount = categoryData.Sum(c => c.Count);
-
             return new StatisticalSummary
             {
-                UniqueValues = categoryData.Count,
                 MissingValues = 0,
-                MostFrequentValue = mostFrequent?.Category ?? "",
-                MostFrequentCount = (int)(mostFrequent?.Count ?? 0),
                 Mean = 0,
                 Median = 0,
                 StandardDeviation = 0,
@@ -525,9 +447,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Range = 0,
                 Q1 = 0,
                 Q3 = 0,
-                IQR = 0,
-                Skewness = 0,
-                Kurtosis = 0
+                IQR = 0
             };
         }
 
@@ -724,12 +644,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public double Q1 { get; set; }
         public double Q3 { get; set; }
         public double IQR { get; set; }
-        public double Skewness { get; set; }
-        public double Kurtosis { get; set; }
-        public int UniqueValues { get; set; }
         public int MissingValues { get; set; }
-        public string MostFrequentValue { get; set; } = string.Empty;
-        public int MostFrequentCount { get; set; }
     }
 
     public class HistogramBin
@@ -746,7 +661,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         public int SampleSize { get; set; }
         public int NonNullCount { get; set; }
-        public int UniqueValueCount { get; set; }
         public int MissingCount { get; set; }
         public double MissingPercentage => SampleSize > 0 ? (double)MissingCount / SampleSize * 100 : 0;
         public double DataQuality => SampleSize > 0 ? (double)NonNullCount / SampleSize * 100 : 0;

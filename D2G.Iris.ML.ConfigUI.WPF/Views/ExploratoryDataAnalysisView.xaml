@@ -172,7 +172,7 @@
                 </Grid>
             </TabItem>
             
-            <TabItem Header="Visualisation">
+            <TabItem Header="Histograms">
                 <views:VisualisationView DataContext="{Binding VisualisationViewModel}"/>
             </TabItem>
 

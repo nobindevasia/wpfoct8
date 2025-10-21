@@ -271,20 +271,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private async Task AnalyzeDataAsync()
         {
-            var logPath = @"C:\Users\n.devasia\Desktop\eda_debug.log";
-            System.IO.File.AppendAllText(logPath, $"\n\n===========================================\n");
-            System.IO.File.AppendAllText(logPath, $"=== EDA: AnalyzeDataAsync CALLED at {DateTime.Now:HH:mm:ss.fff} ===\n");
-            System.IO.File.AppendAllText(logPath, $"===========================================\n");
-
-            Console.WriteLine("===========================================");
-            Console.WriteLine("=== EDA: AnalyzeDataAsync CALLED ===");
-            Console.WriteLine("===========================================");
             try
             {
                 IsLoading = true;
                 LoadingMessage = "Validating configuration...";
-                System.IO.File.AppendAllText(logPath, "EDA: Set IsLoading = true\n");
-                Console.WriteLine("EDA: Set IsLoading = true");
 
                 var databaseConfig = _getDatabaseConfig?.Invoke();
                 var inputFields = _getInputFields?.Invoke();
@@ -334,18 +324,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Loading dataset summary...";
                 await Task.Delay(100);
 
-                Console.WriteLine("Getting dataset summary...");
-                try
-                {
-                    _currentDatasetSummary = await _databaseAnalytics.GetDatasetSummaryAsync(
-                        _connectionString, _tableName, _enabledColumns, _whereClause);
-                    Console.WriteLine("✓ Dataset summary retrieved successfully");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"✗ Dataset summary failed: {ex.GetType().Name} - {ex.Message}");
-                    throw;
-                }
+                _currentDatasetSummary = await _databaseAnalytics.GetDatasetSummaryAsync(
+                    _connectionString, _tableName, _enabledColumns, _whereClause);
 
                 NumberOfRows = (int)_currentDatasetSummary.TotalRows;
                 NumberOfColumns = _currentDatasetSummary.TotalColumns;
@@ -353,18 +333,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Analyzing column statistics...";
                 await Task.Delay(100);
 
-                Console.WriteLine("Getting column statistics...");
-                try
-                {
-                    _currentColumnStatistics = await _databaseAnalytics.GetColumnStatisticsAsync(
-                        _connectionString, _tableName, _enabledColumns, _whereClause);
-                    Console.WriteLine("✓ Column statistics retrieved successfully");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"✗ Column statistics failed: {ex.GetType().Name} - {ex.Message}");
-                    throw;
-                }
+                _currentColumnStatistics = await _databaseAnalytics.GetColumnStatisticsAsync(
+                    _connectionString, _tableName, _enabledColumns, _whereClause);
 
                 LoadingMessage = "Analyzing feature types...";
                 await Task.Delay(100);
@@ -374,63 +344,30 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Analyzing missing values...";
                 await Task.Delay(100);
 
-                Console.WriteLine("EDA: Getting missing values analysis...");
-                try
-                {
-                    var missingValuesInfo = await _databaseAnalytics.GetMissingValuesAnalysisAsync(
-                        _connectionString, _tableName, _enabledColumns, _whereClause);
-                    Console.WriteLine("EDA: ✓ Missing values analysis completed successfully");
+                var missingValuesInfo = await _databaseAnalytics.GetMissingValuesAnalysisAsync(
+                    _connectionString, _tableName, _enabledColumns, _whereClause);
 
-                    await UpdateMissingValuesAsync(missingValuesInfo);
-                    Console.WriteLine("EDA: ✓ UpdateMissingValuesAsync completed");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"EDA: ✗ Missing values analysis failed: {ex.GetType().Name} - {ex.Message}");
-                    throw;
-                }
+                await UpdateMissingValuesAsync(missingValuesInfo);
 
                 LoadingMessage = "Setting up visualization components...";
                 await Task.Delay(100);
 
-                System.IO.File.AppendAllText(logPath, "EDA: Setting up visualization view model\n");
-                Console.WriteLine("EDA: Setting up visualization view model");
-                _visualisationViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
-                System.IO.File.AppendAllText(logPath, "EDA: ✓ Visualization VM setup complete\n");
-                Console.WriteLine("EDA: ✓ Visualization VM setup complete");
-
-                LoadingMessage = "Setting up outlier detection...";
-                await Task.Delay(100);
-
-                System.IO.File.AppendAllText(logPath, "EDA: Setting up outlier detection view model\n");
-                Console.WriteLine("EDA: Setting up outlier detection view model");
-                _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
-                System.IO.File.AppendAllText(logPath, "EDA: ✓ Outlier detection VM setup complete\n");
-                Console.WriteLine("EDA: ✓ Outlier detection VM setup complete");
-
-                System.IO.File.AppendAllText(logPath, "EDA: Setting up scatter plot view model\n");
-                Console.WriteLine("EDA: Setting up scatter plot view model");
-                _scatterPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
-                System.IO.File.AppendAllText(logPath, "EDA: ✓ Scatter plot VM setup complete\n");
-                Console.WriteLine("EDA: ✓ Scatter plot VM setup complete");
-
-                // For ViolinPlot and BoxPlot, exclude target variable from columns list
+                // For Histograms, ViolinPlot and BoxPlot, exclude target variable from columns list
                 // These are univariate analysis tools and don't need the target
                 var columnsWithoutTarget = string.IsNullOrEmpty(targetField)
                     ? _enabledColumns
                     : _enabledColumns.Where(col => !string.Equals(col, targetField, StringComparison.OrdinalIgnoreCase)).ToArray();
 
-                System.IO.File.AppendAllText(logPath, "EDA: Setting up violin plot view model\n");
-                Console.WriteLine("EDA: Setting up violin plot view model");
-                _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
-                System.IO.File.AppendAllText(logPath, "EDA: ✓ Violin plot VM setup complete\n");
-                Console.WriteLine("EDA: ✓ Violin plot VM setup complete");
+                _visualisationViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
 
-                System.IO.File.AppendAllText(logPath, "EDA: Setting up box plot view model\n");
-                Console.WriteLine("EDA: Setting up box plot view model");
+                LoadingMessage = "Setting up outlier detection...";
+                await Task.Delay(100);
+
+                _outlierDetectionViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, targetField, _whereClause);
+                _scatterPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, _enabledColumns, _whereClause);
+
+                _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
-                System.IO.File.AppendAllText(logPath, "EDA: ✓ Box plot VM setup complete\n");
-                Console.WriteLine("EDA: ✓ Box plot VM setup complete");
 
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +

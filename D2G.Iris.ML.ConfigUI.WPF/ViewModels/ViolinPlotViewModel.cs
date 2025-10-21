@@ -195,9 +195,9 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
 
         try
         {
-            IsGeneratingPlot = true;
-            ProgressMessage = $"Loading statistics for '{SelectedColumn}'...";
-            PlotHtml = null;
+            await SetIsGeneratingPlotAsync(true);
+            await SetProgressMessageAsync($"Loading statistics for '{SelectedColumn}'...");
+            await SetPlotHtmlAsync(null);
 
             var stats = await LoadColumnStatisticsAsync();
             if (stats == null || stats.NonNullCount == 0)
@@ -206,7 +206,7 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
-            ProgressMessage = "Fetching sample data...";
+            await SetProgressMessageAsync("Fetching sample data...");
             var distributionData = await LoadDistributionDataAsync();
             if (distributionData == null || distributionData.Count == 0)
             {
@@ -214,11 +214,11 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
                 return;
             }
 
-            ProgressMessage = "Rendering Plotly chart...";
+            await SetProgressMessageAsync("Rendering Plotly chart...");
             var htmlContent = CreatePlotlyHtml(distributionData, SelectedColumn!);
-            PlotHtml = htmlContent;
+            await SetPlotHtmlAsync(htmlContent);
 
-            UpdateStatisticsBanner(distributionData, stats);
+            await UpdateStatisticsBannerAsync(distributionData, stats);
         }
         catch (Exception ex)
         {
@@ -226,8 +226,8 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
         }
         finally
         {
-            ProgressMessage = string.Empty;
-            IsGeneratingPlot = false;
+            await SetProgressMessageAsync(string.Empty);
+            await SetIsGeneratingPlotAsync(false);
         }
     }
 
@@ -284,11 +284,11 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
         return GenericChart.toEmbeddedHTML(violinChart);
     }
 
-    private void UpdateStatisticsBanner(IReadOnlyList<double> samples, ColumnStatistics stats)
+    private async Task UpdateStatisticsBannerAsync(IReadOnlyList<double> samples, ColumnStatistics stats)
     {
         if (samples.Count == 0)
         {
-            StatisticsInfo = string.Empty;
+            await SetStatisticsInfoAsync(string.Empty);
             return;
         }
 
@@ -318,8 +318,8 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
         var stdDev = stats.StdDev ?? StandardDeviation(samples, mean);
         var median = Quantile(0.5);
 
-        StatisticsInfo =
-            $"Count: {samples.Count:N0} | Mean: {mean:F2} | Median: {median:F2} | Std Dev: {stdDev:F2} | Min: {samples.Min():F2} | Max: {samples.Max():F2}";
+        await SetStatisticsInfoAsync(
+            $"Count: {samples.Count:N0} | Mean: {mean:F2} | Median: {median:F2} | Std Dev: {stdDev:F2} | Min: {samples.Min():F2} | Max: {samples.Max():F2}");
     }
 
     private static double StandardDeviation(IReadOnlyCollection<double> values, double mean)
@@ -336,6 +336,31 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
     #endregion
 
     #region Helpers
+
+    private Task RunOnUiAsync(Action action)
+    {
+        if (Application.Current == null)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        if (Application.Current.Dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        return Application.Current.Dispatcher.InvokeAsync(action).Task;
+    }
+
+    private Task SetPlotHtmlAsync(string? html) => RunOnUiAsync(() => PlotHtml = html);
+
+    private Task SetStatisticsInfoAsync(string info) => RunOnUiAsync(() => StatisticsInfo = info);
+
+    private Task SetProgressMessageAsync(string message) => RunOnUiAsync(() => ProgressMessage = message);
+
+    private Task SetIsGeneratingPlotAsync(bool value) => RunOnUiAsync(() => IsGeneratingPlot = value);
 
     private async Task ShowInfoAsync(string message, string title)
     {

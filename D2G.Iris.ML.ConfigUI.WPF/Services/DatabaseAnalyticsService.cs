@@ -63,7 +63,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             return null;
         }
 
-        public async Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null, bool includePercentiles = false)
+        public async Task<List<ColumnStatistics>> GetColumnStatisticsAsync(string connectionString, string tableName, IEnumerable<string> columns, string? whereClause = null, bool includePercentiles = false, bool includeMoments = false)
         {
             var statistics = new List<ColumnStatistics>();
             using (var connection = new SqlConnection(connectionString))
@@ -111,13 +111,79 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 {
                     var hasDataType = dataTypes.TryGetValue(columnName, out var dataType);
                     var shouldIncludePercentiles = includePercentiles && hasDataType && IsNumericSqlType(dataType);
-
+                    var shouldIncludeMoments = includeMoments && hasDataType && IsNumericSqlType(dataType);
                     string query;
-                    if (shouldIncludePercentiles)
+                    if (shouldIncludePercentiles && shouldIncludeMoments)
                     {
                         var percentileWhereClause = string.IsNullOrWhiteSpace(whereClause)
                             ? $" WHERE {columnName} IS NOT NULL"
                             : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL";
+
+                        var selectColumns = new List<string>
+                        {
+                            "COUNT(*) as Count",
+                            $"COUNT({columnName}) as NonNullCount",
+                            $"AVG(CAST({columnName} AS FLOAT)) as Mean",
+                            $"MIN({columnName}) as Min",
+                            $"MAX({columnName}) as Max",
+                            $"STDEV({columnName}) as StdDev",
+                            $"VAR({columnName}) as Variance",
+                            "(SELECT Q1 FROM Percentiles) as Q1",
+                            "(SELECT Median FROM Percentiles) as Median",
+                            "(SELECT Q3 FROM Percentiles) as Q3"
+                        };
+
+                        selectColumns.Add("ISNULL((SELECT Skewness FROM MomentCalcs), 0) as Skewness");
+                        selectColumns.Add("ISNULL((SELECT Kurtosis FROM MomentCalcs), 0) as Kurtosis");
+
+                        var selectClause = string.Join(",\n                            ", selectColumns);
+
+                        query = $@"
+                        WITH Percentiles AS (
+                            SELECT DISTINCT
+                                PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY {columnName}) OVER () as Q1,
+                                PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY {columnName}) OVER () as Median,
+                                PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY {columnName}) OVER () as Q3
+                            FROM {tableName}{percentileWhereClause}
+                        ),
+                        BaseStats AS (
+                            SELECT
+                                AVG(CAST({columnName} AS FLOAT)) as Mean,
+                                STDEV({columnName}) as StdDev
+                            FROM {tableName}{percentileWhereClause}
+                        ),
+                        MomentCalcs AS (
+                            SELECT
+                                SUM(POWER((CAST(t.{columnName} AS FLOAT) - b.Mean) / NULLIF(b.StdDev, 0), 3)) / NULLIF(COUNT(*), 0) as Skewness,
+                                SUM(POWER((CAST(t.{columnName} AS FLOAT) - b.Mean) / NULLIF(b.StdDev, 0), 4)) / NULLIF(COUNT(*), 0) - 3 as Kurtosis
+                            FROM {tableName} t, BaseStats b
+                            {percentileWhereClause}
+                        )
+                        SELECT
+                            {selectClause}
+                        FROM {tableName}{whereCondition}";
+                    }
+                    else if (shouldIncludePercentiles && !shouldIncludeMoments)
+                    {
+                        var percentileWhereClause = string.IsNullOrWhiteSpace(whereClause)
+                            ? $" WHERE {columnName} IS NOT NULL"
+                            : $" WHERE ({whereClause}) AND {columnName} IS NOT NULL";
+
+                        var selectColumns = new List<string>
+                        {
+                            "COUNT(*) as Count",
+                            $"COUNT({columnName}) as NonNullCount",
+                            $"AVG(CAST({columnName} AS FLOAT)) as Mean",
+                            $"MIN({columnName}) as Min",
+                            $"MAX({columnName}) as Max",
+                            $"STDEV({columnName}) as StdDev",
+                            $"VAR({columnName}) as Variance",
+                            "(SELECT Q1 FROM Percentiles) as Q1",
+                            "(SELECT Median FROM Percentiles) as Median",
+                            "(SELECT Q3 FROM Percentiles) as Q3"
+                        };
+
+                        var selectClause = string.Join(",\n                            ", selectColumns);
 
                         query = $@"
                         WITH Percentiles AS (
@@ -128,29 +194,27 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                             FROM {tableName}{percentileWhereClause}
                         )
                         SELECT
-                            COUNT(*) as Count,
-                            COUNT({columnName}) as NonNullCount,
-                            AVG(CAST({columnName} AS FLOAT)) as Mean,
-                            MIN({columnName}) as Min,
-                            MAX({columnName}) as Max,
-                            STDEV({columnName}) as StdDev,
-                            VAR({columnName}) as Variance,
-                            (SELECT Q1 FROM Percentiles) as Q1,
-                            (SELECT Median FROM Percentiles) as Median,
-                            (SELECT Q3 FROM Percentiles) as Q3
+                            {selectClause}
                         FROM {tableName}{whereCondition}";
                     }
                     else
                     {
+                        var selectColumns = new List<string>
+                        {
+                            "COUNT(*) as Count",
+                            $"COUNT({columnName}) as NonNullCount",
+                            $"AVG(CAST({columnName} AS FLOAT)) as Mean",
+                            $"MIN({columnName}) as Min",
+                            $"MAX({columnName}) as Max",
+                            $"STDEV({columnName}) as StdDev",
+                            $"VAR({columnName}) as Variance"
+                        };
+
+                        var selectClause = string.Join(",\n                            ", selectColumns);
+
                         query = $@"
                         SELECT
-                            COUNT(*) as Count,
-                            COUNT({columnName}) as NonNullCount,
-                            AVG(CAST({columnName} AS FLOAT)) as Mean,
-                            MIN({columnName}) as Min,
-                            MAX({columnName}) as Max,
-                            STDEV({columnName}) as StdDev,
-                            VAR({columnName}) as Variance
+                            {selectClause}
                         FROM {tableName}{whereCondition}";
                     }
 
@@ -164,9 +228,21 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                                 var q1 = 0d;
                                 var median = 0d;
                                 var q3 = 0d;
+                                var skewness = 0d;
+                                var kurtosis = 0d;
 
-                                if (shouldIncludePercentiles)
+                                if (shouldIncludePercentiles && shouldIncludeMoments)
                                 {
+                                    // Has percentiles AND moments: 0-6 basic, 7-9 percentiles, 10-11 moments
+                                    q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7));
+                                    median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8));
+                                    q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9));
+                                    skewness = reader.IsDBNull(10) ? 0 : Convert.ToDouble(reader.GetValue(10));
+                                    kurtosis = reader.IsDBNull(11) ? 0 : Convert.ToDouble(reader.GetValue(11));
+                                }
+                                else if (shouldIncludePercentiles && !shouldIncludeMoments)
+                                {
+                                    // Has percentiles only: 0-6 basic, 7-9 percentiles
                                     q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7));
                                     median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8));
                                     q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9));
@@ -185,7 +261,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                                     Variance = reader.IsDBNull(6) ? (double?)null : Convert.ToDouble(reader.GetValue(6)),
                                     Q1 = q1,
                                     Median = median,
-                                    Q3 = q3
+                                    Q3 = q3,
+                                    Skewness = skewness,
+                                    Kurtosis = kurtosis
                                 });
                             }
                         }
@@ -1125,10 +1203,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
         public double? StdDev { get; set; }
         public double? Variance { get; set; }
         public double? StandardDeviation => StdDev;
-        public long? UniqueCount { get; set; }
         public double Q1 { get; set; }
         public double Median { get; set; }
         public double Q3 { get; set; }
+        public double Skewness { get; set; }
+        public double Kurtosis { get; set; }
     }
 
     public class Percentiles

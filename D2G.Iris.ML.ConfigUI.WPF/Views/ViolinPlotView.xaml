@@ -4,11 +4,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+             xmlns:converters="clr-namespace:D2G.Iris.ML.ConfigUI.WPF.Converters"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
     </UserControl.Resources>
 
     <Grid>
@@ -91,10 +93,11 @@
             <wv2:WebView2 x:Name="PlotWebView"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
-                          DefaultBackgroundColor="Transparent"/>
+                          DefaultBackgroundColor="White"/>
 
-            <!-- Loading Overlay -->
-            <Border Background="#80FFFFFF"
+            <!-- Loading Overlay - Always on top with Panel.ZIndex -->
+            <Border Background="#F5F5F5"
+                    Panel.ZIndex="1000"
                     Visibility="{Binding IsGeneratingPlot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">

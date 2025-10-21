@@ -89,13 +89,15 @@
                            FontStyle="Italic"
                            Margin="0,5"/>
 
-                
-                <Label Grid.Row="10" Grid.Column="0" Content="Test Fraction:" VerticalAlignment="Center"
+
+                <Label Grid.Row="10" Grid.Column="0" Content="Test Percentage:" VerticalAlignment="Center"
                        Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                <TextBox Grid.Row="10" Grid.Column="1" 
-                         Text="{Binding TestFraction, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
-                         VerticalAlignment="Center" Height="25" Width="120" HorizontalAlignment="Left"
-                         Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal"
+                            Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBox Text="{Binding TestFraction, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}"
+                             VerticalAlignment="Center" Height="25" Width="80"/>
+                    <Label Content="%" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                </StackPanel>
 
                 
                 <GroupBox Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="2" 

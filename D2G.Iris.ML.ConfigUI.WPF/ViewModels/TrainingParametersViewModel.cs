@@ -16,7 +16,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         private readonly IDialogService _dialogService;
         private string _selectedAlgorithm = "fasttree";
-        private decimal _testFraction = 0.2m;
+        private decimal _testFraction = 20m; // Stored as percentage (0-100)
         private ModelType _currentModelType = ModelType.BinaryClassification;
         private Models.ParameterItem? _selectedParameter;
 
@@ -69,7 +69,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => UseAutoML
                 ? "AutoML will automatically try multiple algorithms and find the best performing model. Data splitting is handled automatically using cross-validation."
-                : "Traditional training uses the specified algorithm with configured parameters. You can specify the test fraction for evaluation.";
+                : "Traditional training uses the specified algorithm with configured parameters. You can specify the test percentage for evaluation.";
         }
 
         public string SelectedAlgorithm
@@ -356,7 +356,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 SelectedAlgorithm = matchingAlgorithm ?? (AvailableAlgorithms.Count > 0 ? AvailableAlgorithms[0] : "fasttree");
             }
 
-            TestFraction = (decimal)parameters.TestFraction;
+            TestFraction = (decimal)(parameters.TestFraction * 100); // Convert fraction to percentage
 
             Parameters.Clear();
             if (parameters.AlgorithmParameters != null)
@@ -395,7 +395,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             var trainingParams = new TrainingParameters
             {
                 Algorithm = SelectedAlgorithm,
-                TestFraction = (double)TestFraction,
+                TestFraction = (double)TestFraction / 100.0, // Convert percentage to fraction
                 AlgorithmParameters = algorithmParameters
             };
 

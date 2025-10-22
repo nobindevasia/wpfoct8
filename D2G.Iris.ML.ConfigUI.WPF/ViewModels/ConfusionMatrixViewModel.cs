@@ -233,14 +233,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 for (int column = 0; column < cols; column++)
                 {
-                    // When reversing, we need to map the matrix indices to display indices
-                    int matrixRow = shouldReverse ? (rows - 1 - row) : row;
-                    int matrixColumn = shouldReverse ? (cols - 1 - column) : column;
-
-                    double cellValue = confusionMatrix[matrixRow, matrixColumn];
+                    double cellValue = confusionMatrix[row, column];
                     double normalized = safeMax > 0 ? cellValue / safeMax : 0;
                     normalized = Math.Clamp(normalized, 0d, 1d);
 
+                    // Use the reversed labels if applicable
                     string rowLabel = row < labelsCopy.Count ? labelsCopy[row] : $"Class {row}";
                     string columnLabel = column < labelsCopy.Count ? labelsCopy[column] : $"Class {column}";
                     string backgroundColor = GetHeatmapColor(normalized);

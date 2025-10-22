@@ -23,7 +23,7 @@ namespace D2G.Iris.ML.Training
             _trainerFactory = trainerFactory ?? throw new ArgumentNullException(nameof(trainerFactory));
         }
 
-        public abstract Task<ITransformer> TrainModel(
+        public abstract Task<TrainingResult> TrainModel(
             MLContext mlContext,
             IDataView dataView,
             string[] featureNames,

@@ -6,7 +6,7 @@ namespace D2G.Iris.ML.Core.Interfaces
 {
     public interface IModelTrainer
     {
-        Task<ITransformer> TrainModel(
+        Task<TrainingResult> TrainModel(
             MLContext mlContext,
             IDataView dataView,
             string[] featureNames,

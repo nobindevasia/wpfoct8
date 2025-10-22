@@ -28,7 +28,7 @@ namespace D2G.Iris.ML.Training
             public float Label { get; set; }
         }
 
-        public override async Task<ITransformer> TrainModel(
+        public override async Task<TrainingResult> TrainModel(
             MLContext mlContext,
             IDataView dataView,
             string[] featureNames,
@@ -75,7 +75,7 @@ namespace D2G.Iris.ML.Training
             return dataView;
         }
 
-        private async Task<ITransformer> TrainWithAdvancedAutoML(
+        private async Task<TrainingResult> TrainWithAdvancedAutoML(
             MLContext mlContext,
             IDataView preparedData,
             string[] featureNames,
@@ -146,7 +146,12 @@ namespace D2G.Iris.ML.Training
                 mlContext.Model.Save(bestRun.Model, preparedData.Schema, modelPath);
                 Console.WriteLine($"\nModel saved to: {modelPath}");
 
-                return bestRun.Model;
+                return new TrainingResult
+                {
+                    Model = bestRun.Model,
+                    Metrics = bestRun.ValidationMetrics,
+                    AlgorithmUsed = bestTrainerName
+                };
             }
             catch (Exception ex)
             {
@@ -248,7 +253,7 @@ namespace D2G.Iris.ML.Training
             };
         }
 
-        private async Task<ITransformer> TrainWithTraditionalApproach(
+        private async Task<TrainingResult> TrainWithTraditionalApproach(
             MLContext mlContext,
             IDataView preparedData,
             string[] featureNames,
@@ -303,7 +308,12 @@ namespace D2G.Iris.ML.Training
                 config,
                 processedData);
 
-            return model;
+            return new TrainingResult
+            {
+                Model = model,
+                Metrics = metrics,
+                AlgorithmUsed = config.TrainingParameters.Algorithm
+            };
         }
 
         private IDataView PrepareData(IDataView dataView, string[] featureNames)

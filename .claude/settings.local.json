@@ -57,7 +57,8 @@
       "Bash(curl -s \"https://api.github.com/repos/nobindevasia/oct17/contents/D2G.Iris.ML.ConfigUI.WPF/ViewModels\")",
       "mcp__ide__getDiagnostics",
       "WebFetch(domain:www.scichart.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(Select-Object -First 5)"
     ],
     "deny": [],
     "ask": []

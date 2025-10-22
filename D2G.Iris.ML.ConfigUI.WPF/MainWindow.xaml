@@ -66,6 +66,10 @@
             <TabItem Header="Training Logs">
                 <views:TrainingLogsView DataContext="{Binding TrainingLogs}"/>
             </TabItem>
+
+            <TabItem Header="Post-Training Visualizations">
+                <views:PostTrainingVisualizationsView DataContext="{Binding PostTrainingVisualizations}"/>
+            </TabItem>
         </TabControl>
 
         <Button Grid.Row="2" 

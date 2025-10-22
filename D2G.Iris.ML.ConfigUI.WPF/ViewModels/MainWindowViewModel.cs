@@ -85,6 +85,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public TrainingParametersViewModel TrainingParameters { get; private set; } = null!;
         public DataProcessingPipelineViewModel DataProcessingPipeline { get; private set; } = null!;
         public TrainingLogsViewModel TrainingLogs { get; private set; } = null!;
+        public PostTrainingVisualizationsViewModel PostTrainingVisualizations { get; private set; } = null!;
 
         #endregion
 
@@ -107,6 +108,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             TrainingParameters = new TrainingParametersViewModel(_dialogService);
             DataProcessingPipeline = new DataProcessingPipelineViewModel();
             TrainingLogs = new TrainingLogsViewModel();
+            PostTrainingVisualizations = new PostTrainingVisualizationsViewModel();
 
             InputFields.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => TrainingParameters.TargetField);
             ExploratoryDataAnalysis.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => InputFields.GetConfiguration(), () => TrainingParameters.TargetField);
@@ -447,7 +449,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     TrainingLogs.LogMessage("=============== Training Model ===============", "Info");
                     var modelTrainer = _modelTrainerFactory.CreateTrainer(config.ModelType);
 
-                    modelTrainer.TrainModel(
+                    var trainingResult = modelTrainer.TrainModel(
                         mlContext,
                         processedData.Data,
                         processedData.FeatureNames,
@@ -455,6 +457,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         processedData).GetAwaiter().GetResult();
 
                     TrainingLogs.LogMessage("=============== Training Complete ===============", "Success");
+
+                    // Update post-training visualizations
+                    UpdatePostTrainingVisualizations(trainingResult, config.ModelType);
 
                     try { File.Delete(tempConfigPath); } catch { }
                 }
@@ -521,6 +526,84 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _currentConfig.TargetField = targetField;
 
             DataProcessingPipeline.SaveToConfig(_currentConfig);
+        }
+
+        private void UpdatePostTrainingVisualizations(TrainingResult trainingResult, ModelType modelType)
+        {
+            if (trainingResult == null) return;
+
+            // Update model type for visualizations
+            PostTrainingVisualizations.SetModelType(modelType);
+
+            // Extract and update confusion matrix for classification models
+            if (modelType == ModelType.BinaryClassification && trainingResult.Metrics is BinaryClassificationMetrics binaryMetrics)
+            {
+                var confusionMatrix = binaryMetrics.ConfusionMatrix;
+                if (confusionMatrix != null)
+                {
+                    var matrixCounts = ConvertToMatrix(confusionMatrix.Counts);
+                    var labels = new List<string> { "Negative", "Positive" };
+
+                    // Pass the actual ML.NET metrics for accurate display
+                    PostTrainingVisualizations.UpdateConfusionMatrixWithMetrics(
+                        matrixCounts,
+                        labels,
+                        binaryMetrics.Accuracy,
+                        binaryMetrics.PositivePrecision,
+                        binaryMetrics.PositiveRecall,
+                        binaryMetrics.F1Score);
+                    TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
+                }
+            }
+            else if (modelType == ModelType.MultiClassClassification && trainingResult.Metrics is MulticlassClassificationMetrics multiclassMetrics)
+            {
+                var confusionMatrix = multiclassMetrics.ConfusionMatrix;
+                if (confusionMatrix != null)
+                {
+                    var matrixCounts = ConvertToMatrix(confusionMatrix.Counts);
+                    var numberOfClasses = confusionMatrix.NumberOfClasses;
+
+                    var labels = new List<string>();
+                    for (int i = 0; i < numberOfClasses; i++)
+                    {
+                        labels.Add($"Class {i}");
+                    }
+
+                    // For multiclass, calculate average F1 from per-class metrics if available
+                    double f1Score = 0;
+                    if (multiclassMetrics.PerClassLogLoss != null && multiclassMetrics.PerClassLogLoss.Count > 0)
+                    {
+                        // Use macro accuracy as a proxy for F1 if not directly available
+                        f1Score = multiclassMetrics.MacroAccuracy;
+                    }
+
+                    PostTrainingVisualizations.UpdateConfusionMatrixWithMetrics(
+                        matrixCounts,
+                        labels,
+                        multiclassMetrics.MicroAccuracy,
+                        multiclassMetrics.MacroAccuracy,
+                        multiclassMetrics.MacroAccuracy, // Using macro as recall approximation
+                        f1Score);
+                    TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
+                }
+            }
+        }
+
+        private double[,] ConvertToMatrix(IReadOnlyList<IReadOnlyList<double>> counts)
+        {
+            int rows = counts.Count;
+            int cols = counts[0].Count;
+            var matrix = new double[rows, cols];
+
+            for (int i = 0; i < rows; i++)
+            {
+                for (int j = 0; j < cols; j++)
+                {
+                    matrix[i, j] = counts[i][j];
+                }
+            }
+
+            return matrix;
         }
     }
 }

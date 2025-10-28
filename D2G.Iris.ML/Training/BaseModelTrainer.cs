@@ -15,9 +15,9 @@ namespace D2G.Iris.ML.Training
     public abstract class BaseModelTrainer : IModelTrainer
     {
         protected readonly MLContext _mlContext;
-        protected readonly TrainerFactory _trainerFactory;
+        protected readonly ITrainerFactory _trainerFactory;
 
-        protected BaseModelTrainer(MLContext mlContext, TrainerFactory trainerFactory)
+        protected BaseModelTrainer(MLContext mlContext, ITrainerFactory trainerFactory)
         {
             _mlContext = mlContext ?? throw new ArgumentNullException(nameof(mlContext));
             _trainerFactory = trainerFactory ?? throw new ArgumentNullException(nameof(trainerFactory));

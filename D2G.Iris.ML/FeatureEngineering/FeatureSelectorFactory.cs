@@ -5,7 +5,7 @@ using D2G.Iris.ML.Core.Interfaces;
 
 namespace D2G.Iris.ML.FeatureEngineering
 {
-    public class FeatureSelectorFactory
+    public class FeatureSelectorFactory : IFeatureSelectorFactory
     {
         private readonly MLContext _mlContext;
 

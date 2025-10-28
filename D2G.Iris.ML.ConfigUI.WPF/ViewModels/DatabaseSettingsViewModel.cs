@@ -19,10 +19,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private bool _isLoadingTables = false;
         private TableInfo? _selectedTable;
 
-        public DatabaseSettingsViewModel(IDialogService dialogService, IDatabaseSchemaLoader? schemaLoader = null)
+        public DatabaseSettingsViewModel(IDialogService dialogService, IDatabaseSchemaLoader schemaLoader)
         {
             _dialogService = dialogService;
-            _schemaLoader = schemaLoader ?? new DatabaseSchemaLoader();
+            _schemaLoader = schemaLoader;
 
             Databases = new ObservableCollection<string>();
             Tables = new ObservableCollection<TableInfo>();

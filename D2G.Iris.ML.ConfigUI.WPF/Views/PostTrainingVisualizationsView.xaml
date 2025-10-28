@@ -69,7 +69,7 @@
                     BorderBrush="#BDC3C7"
                     BorderThickness="2">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="🎯" FontSize="80" HorizontalAlignment="Center" Margin="0,0,0,25" Opacity="0.5"/>
+                    <TextBlock FontSize="80" HorizontalAlignment="Center" Margin="0,0,0,25" Opacity="0.5"/>
                     <TextBlock Text="No Training Results Yet"
                                FontSize="24"
                                FontWeight="Bold"
@@ -155,20 +155,25 @@
                     </Border>
                 </TabItem>
 
-                <!-- Future Visualization Tabs -->
                 <!-- ROC Curve Tab (for binary classification) -->
-                <TabItem Header="📊 ROC Curve" IsEnabled="False" Visibility="Collapsed">
+                <TabItem Header="ROC-AUC Curve"
+                         Visibility="{Binding IsRocCurveAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
                             BorderThickness="1,0,1,1"
                             CornerRadius="0,6,6,6">
-                        <Grid>
-                            <TextBlock Text="ROC Curve visualization will be available here"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="16"
-                                       Foreground="#95A5A6"/>
-                        </Grid>
+                        <views:RocCurveView DataContext="{Binding RocCurve}"/>
+                    </Border>
+                </TabItem>
+
+                <!-- Precision-Recall Curve Tab (for binary classification) -->
+                <TabItem Header="📈 Precision-Recall Curve"
+                         Visibility="{Binding IsPrecisionRecallCurveAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border Background="White"
+                            BorderBrush="#BDC3C7"
+                            BorderThickness="1,0,1,1"
+                            CornerRadius="0,6,6,6">
+                        <views:PrecisionRecallCurveView DataContext="{Binding PrecisionRecallCurve}"/>
                     </Border>
                 </TabItem>
 
@@ -189,7 +194,7 @@
                 </TabItem>
 
                 <!-- Feature Importance Tab -->
-                <TabItem Header="⭐ Feature Importance" IsEnabled="False" Visibility="Collapsed">
+                <TabItem Header="Feature Importance" IsEnabled="False" Visibility="Collapsed">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
                             BorderThickness="1,0,1,1"

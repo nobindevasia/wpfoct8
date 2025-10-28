@@ -8,12 +8,12 @@ namespace D2G.Iris.ML.Training
     public class ModelTrainerFactory : IModelTrainerFactory
     {
         private readonly MLContext _mlContext;
-        private readonly TrainerFactory _trainerFactory;
+        private readonly ITrainerFactory _trainerFactory;
 
-        public ModelTrainerFactory(MLContext mlContext)
+        public ModelTrainerFactory(MLContext mlContext, ITrainerFactory trainerFactory)
         {
             _mlContext = mlContext;
-            _trainerFactory = new TrainerFactory(mlContext);
+            _trainerFactory = trainerFactory;
         }
 
         public IModelTrainer CreateTrainer(ModelType modelType)

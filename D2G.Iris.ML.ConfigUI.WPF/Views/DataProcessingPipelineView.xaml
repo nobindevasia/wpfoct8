@@ -100,19 +100,19 @@
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                        
+
                         <Label Grid.Row="4" Grid.Column="0" Content="Under Ratio:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="4" Grid.Column="1" 
-                                 Text="{Binding DataBalancing.UndersamplingRatio, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
+                        <TextBox Grid.Row="4" Grid.Column="1"
+                                 Text="{Binding DataBalancing.UndersamplingRatioText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                        
+
                         <Label Grid.Row="6" Grid.Column="0" Content="Min to Maj Ratio:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="6" Grid.Column="1" 
-                                 Text="{Binding DataBalancing.MinorityToMajorityRatio, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
+                        <TextBox Grid.Row="6" Grid.Column="1"
+                                 Text="{Binding DataBalancing.MinorityToMajorityRatioText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding DataBalancing.IsSmoteSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
@@ -180,11 +180,11 @@
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding FeatureEngineering.IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-                        
+
                         <Label Grid.Row="6" Grid.Column="0" Content="Threshold:" Style="{StaticResource CompactLabelStyle}"
                                Visibility="{Binding FeatureEngineering.IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-                        <TextBox Grid.Row="6" Grid.Column="1" 
-                                 Text="{Binding FeatureEngineering.MulticollinearityThreshold, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
+                        <TextBox Grid.Row="6" Grid.Column="1"
+                                 Text="{Binding FeatureEngineering.MulticollinearityThresholdText, UpdateSourceTrigger=PropertyChanged}"
                                  Style="{StaticResource CompactInputStyle}" Width="60" HorizontalAlignment="Left"
                                  Visibility="{Binding FeatureEngineering.IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 

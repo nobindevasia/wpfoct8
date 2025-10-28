@@ -13,6 +13,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private int _numberOfComponents = 3;
         private int _maxFeatures = 10;
         private decimal _multicollinearityThreshold = 0.7m;
+        private string _multicollinearityThresholdText = "0.7";
         private string _description = "No feature selection will be applied. All enabled features will be used for training.";
 
         public FeatureEngineeringViewModel()
@@ -62,6 +63,27 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _multicollinearityThreshold, Math.Max(0.1m, Math.Min(1.0m, value)));
         }
 
+        public string MulticollinearityThresholdText
+        {
+            get => _multicollinearityThresholdText;
+            set
+            {
+                if (SetProperty(ref _multicollinearityThresholdText, value))
+                {
+                    // Try to parse and update the decimal value
+                    if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal result))
+                    {
+                        _multicollinearityThreshold = Math.Max(0.1m, Math.Min(1.0m, result));
+                    }
+                    else if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _multicollinearityThreshold = 0.7m;
+                    }
+                }
+            }
+        }
+
         public string Description
         {
             get => _description;
@@ -99,6 +121,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 NumberOfComponents = 3;
                 MaxFeatures = 10;
                 MulticollinearityThreshold = 0.7m;
+                MulticollinearityThresholdText = "0.7";
                 return;
             }
 
@@ -107,6 +130,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             NumberOfComponents = config.NumberOfComponents;
             MaxFeatures = config.MaxFeatures;
             MulticollinearityThreshold = (decimal)config.MulticollinearityThreshold;
+            MulticollinearityThresholdText = config.MulticollinearityThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         public FeatureEngineeringConfig GetConfiguration()

@@ -7,12 +7,13 @@ using Microsoft.ML.Trainers;
 using Microsoft.ML.Trainers.FastTree;
 using Microsoft.ML.Trainers.LightGbm;
 using D2G.Iris.ML.Core.Enums;
+using D2G.Iris.ML.Core.Interfaces;
 using D2G.Iris.ML.Core.Models;
 using D2G.Iris.ML.Utils;
 
 namespace D2G.Iris.ML.Training
 {
-    public class TrainerFactory
+    public class TrainerFactory : ITrainerFactory
     {
         private readonly MLContext _mlContext;
 

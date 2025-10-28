@@ -42,7 +42,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             IDataLoader dataLoader,
             IDataProcessor dataProcessor,
             IModelTrainerFactory modelTrainerFactory,
-            IDatabaseAnalyticsService databaseAnalytics)
+            IDatabaseAnalyticsService databaseAnalytics,
+            GeneralSettingsViewModel generalSettings,
+            DatabaseSettingsViewModel databaseSettings,
+            InputFieldsViewModel inputFields,
+            ExploratoryDataAnalysisViewModel exploratoryDataAnalysis,
+            TrainingParametersViewModel trainingParameters,
+            DataProcessingPipelineViewModel dataProcessingPipeline,
+            TrainingLogsViewModel trainingLogs,
+            PostTrainingVisualizationsViewModel postTrainingVisualizations)
         {
             _configService = configService;
             _dialogService = dialogService;
@@ -53,7 +61,16 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _modelTrainerFactory = modelTrainerFactory;
             _databaseAnalytics = databaseAnalytics;
 
-            InitializeViewModels();
+            GeneralSettings = generalSettings;
+            DatabaseSettings = databaseSettings;
+            InputFields = inputFields;
+            ExploratoryDataAnalysis = exploratoryDataAnalysis;
+            TrainingParameters = trainingParameters;
+            DataProcessingPipeline = dataProcessingPipeline;
+            TrainingLogs = trainingLogs;
+            PostTrainingVisualizations = postTrainingVisualizations;
+
+            InitializeViewModelDependencies();
             InitializeCommands();
             LoadExistingConfigOnStartup();
         }
@@ -99,17 +116,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #endregion
 
-        private void InitializeViewModels()
+        private void InitializeViewModelDependencies()
         {
-            GeneralSettings = new GeneralSettingsViewModel();
-            DatabaseSettings = new DatabaseSettingsViewModel(_dialogService);
-            InputFields = new InputFieldsViewModel(_dialogService);
-            ExploratoryDataAnalysis = new ExploratoryDataAnalysisViewModel(_dialogService, _databaseAnalytics);
-            TrainingParameters = new TrainingParametersViewModel(_dialogService);
-            DataProcessingPipeline = new DataProcessingPipelineViewModel();
-            TrainingLogs = new TrainingLogsViewModel();
-            PostTrainingVisualizations = new PostTrainingVisualizationsViewModel();
-
             InputFields.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => TrainingParameters.TargetField);
             ExploratoryDataAnalysis.SetDependencies(() => DatabaseSettings.GetConfiguration(), () => InputFields.GetConfiguration(), () => TrainingParameters.TargetField);
         }
@@ -553,6 +561,30 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         binaryMetrics.PositiveRecall,
                         binaryMetrics.F1Score);
                     TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
+                }
+
+                // Update ROC curve if data is available
+                if (trainingResult.RocCurveFpr != null && trainingResult.RocCurveTpr != null &&
+                    trainingResult.RocCurveThresholds != null && trainingResult.RocCurveFpr.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdateRocCurve(
+                        trainingResult.RocCurveFpr,
+                        trainingResult.RocCurveTpr,
+                        trainingResult.RocCurveThresholds,
+                        trainingResult.AucScore);
+                    TrainingLogs.LogMessage($"ROC curve visualization updated (AUC: {trainingResult.AucScore:F4})", "Info");
+                }
+
+                // Update Precision-Recall curve if data is available
+                if (trainingResult.PrecisionRecallPrecision != null && trainingResult.PrecisionRecallRecall != null &&
+                    trainingResult.PrecisionRecallThresholds != null && trainingResult.PrecisionRecallPrecision.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdatePrecisionRecallCurve(
+                        trainingResult.PrecisionRecallPrecision,
+                        trainingResult.PrecisionRecallRecall,
+                        trainingResult.PrecisionRecallThresholds,
+                        trainingResult.AveragePrecision);
+                    TrainingLogs.LogMessage($"Precision-Recall curve visualization updated (AP: {trainingResult.AveragePrecision:F4})", "Info");
                 }
             }
             else if (modelType == ModelType.MultiClassClassification && trainingResult.Metrics is MulticlassClassificationMetrics multiclassMetrics)

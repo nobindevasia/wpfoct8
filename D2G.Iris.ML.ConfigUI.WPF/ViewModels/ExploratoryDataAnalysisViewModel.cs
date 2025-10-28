@@ -60,17 +60,24 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string[]? _enabledColumns;
         private string? _whereClause;
 
-        public ExploratoryDataAnalysisViewModel(IDialogService dialogService, IDatabaseAnalyticsService? databaseAnalytics = null)
+        public ExploratoryDataAnalysisViewModel(
+            IDialogService dialogService,
+            IDatabaseAnalyticsService databaseAnalytics,
+            VisualisationViewModel visualisationViewModel,
+            OutlierDetectionViewModel outlierDetectionViewModel,
+            ScatterPlotViewModel scatterPlotViewModel,
+            ViolinPlotViewModel violinPlotViewModel,
+            BoxPlotViewModel boxPlotViewModel)
         {
             _dialogService = dialogService;
-            _databaseAnalytics = databaseAnalytics ?? new DatabaseAnalyticsService();
+            _databaseAnalytics = databaseAnalytics;
             _featureTypes = new ObservableCollection<FeatureTypeInfo>();
             _columnMissingValues = new ObservableCollection<ColumnMissingInfo>();
-            _visualisationViewModel = new VisualisationViewModel(dialogService, _databaseAnalytics);
-            _outlierDetectionViewModel = new OutlierDetectionViewModel(dialogService, _databaseAnalytics);
-            _scatterPlotViewModel = new ScatterPlotViewModel(dialogService, _databaseAnalytics);
-            _violinPlotViewModel = new ViolinPlotViewModel(dialogService, _databaseAnalytics);
-            _boxPlotViewModel = new BoxPlotViewModel(dialogService, _databaseAnalytics);
+            _visualisationViewModel = visualisationViewModel;
+            _outlierDetectionViewModel = outlierDetectionViewModel;
+            _scatterPlotViewModel = scatterPlotViewModel;
+            _violinPlotViewModel = violinPlotViewModel;
+            _boxPlotViewModel = boxPlotViewModel;
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
             GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());

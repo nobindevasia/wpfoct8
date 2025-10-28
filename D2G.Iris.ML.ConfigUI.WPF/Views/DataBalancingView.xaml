@@ -48,29 +48,48 @@
                      VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
                      IsEnabled="{Binding IsSmoteSelected}"/>
 
-            
+
             <Label Grid.Row="4" Grid.Column="0" Content="K Neighbors:" VerticalAlignment="Center"
-                   IsEnabled="{Binding IsSmoteSelected}"/>
-            <TextBox Grid.Row="4" Grid.Column="1" 
-                     Text="{Binding KNeighbors, UpdateSourceTrigger=PropertyChanged}" 
-                     VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
-                     IsEnabled="{Binding IsSmoteSelected}"/>
+                   IsEnabled="{Binding IsSmoteSelected}"
+                   ToolTip="Number of nearest neighbors for SMOTE (1-20)"/>
+            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding KNeighbors, UpdateSourceTrigger=LostFocus, TargetNullValue=''}"
+                         VerticalAlignment="Center" Height="25" Width="80"
+                         IsEnabled="{Binding IsSmoteSelected}"
+                         ToolTip="Enter number of neighbors (e.g., 5)"/>
+                <TextBlock Text=" (e.g., 5)" VerticalAlignment="Center" Margin="5,0,0,0"
+                           Foreground="Gray" FontSize="10"/>
+            </StackPanel>
 
-            
+
             <Label Grid.Row="6" Grid.Column="0" Content="Undersampling Ratio:" VerticalAlignment="Center"
-                   IsEnabled="{Binding IsSmoteSelected}"/>
-            <TextBox Grid.Row="6" Grid.Column="1" 
-                     Text="{Binding UndersamplingRatio, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
-                     VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
-                     IsEnabled="{Binding IsSmoteSelected}"/>
+                   IsEnabled="{Binding IsSmoteSelected}"
+                   ToolTip="Fraction of majority class to keep"/>
+            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding UndersamplingRatioText, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25" Width="80"
+                         IsEnabled="{Binding IsSmoteSelected}"
+                         PreviewTextInput="DecimalTextBox_PreviewTextInput"
+                         DataObject.Pasting="DecimalTextBox_Pasting"
+                         ToolTip="Enter decimal value (e.g., 0.5 or 1.0)"/>
+                <TextBlock Text=" (e.g., 0.5)" VerticalAlignment="Center" Margin="5,0,0,0"
+                           Foreground="Gray" FontSize="10"/>
+            </StackPanel>
 
-            
+
             <Label Grid.Row="8" Grid.Column="0" Content="Minority to Majority Ratio:" VerticalAlignment="Center"
-                   IsEnabled="{Binding IsSmoteSelected}"/>
-            <TextBox Grid.Row="8" Grid.Column="1" 
-                     Text="{Binding MinorityToMajorityRatio, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
-                     VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
-                     IsEnabled="{Binding IsSmoteSelected}"/>
+                   IsEnabled="{Binding IsSmoteSelected}"
+                   ToolTip="Target ratio of minority to majority after balancing"/>
+            <StackPanel Grid.Row="8" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding MinorityToMajorityRatioText, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25" Width="80"
+                         IsEnabled="{Binding IsSmoteSelected}"
+                         PreviewTextInput="DecimalTextBox_PreviewTextInput"
+                         DataObject.Pasting="DecimalTextBox_Pasting"
+                         ToolTip="Enter decimal value (e.g., 0.8 or 1.0)"/>
+                <TextBlock Text=" (e.g., 0.8)" VerticalAlignment="Center" Margin="5,0,0,0"
+                           Foreground="Gray" FontSize="10"/>
+            </StackPanel>
 
             
             <TextBlock Grid.Row="10" Grid.Column="0" Grid.ColumnSpan="2" 

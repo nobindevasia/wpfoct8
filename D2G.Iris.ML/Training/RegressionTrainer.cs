@@ -16,7 +16,7 @@ namespace D2G.Iris.ML.Training
     public class RegressionTrainer : BaseModelTrainer
     {
 
-        public RegressionTrainer(MLContext mlContext, TrainerFactory trainerFactory)
+        public RegressionTrainer(MLContext mlContext, ITrainerFactory trainerFactory)
             : base(mlContext, trainerFactory)
         {
         }

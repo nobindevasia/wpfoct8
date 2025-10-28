@@ -30,6 +30,12 @@ namespace D2G.Iris.ML.FeatureEngineering
             public T Label { get; set; }
         }
 
+        private class FixedFeatureVector<T>
+        {
+            public float[] Features { get; set; }
+            public T Label { get; set; }
+        }
+
         public async Task<(IDataView transformedData, string[] selectedFeatures, string report)> SelectFeatures(
             MLContext mlContext,
             IDataView data,
@@ -168,30 +174,45 @@ namespace D2G.Iris.ML.FeatureEngineering
                     _report.AppendLine($"- {feature} (correlation with target: {targetCorrelations[feature]:F4})");
                 }
 
+                // Create the transformedData with proper fixed-size vector
                 IDataView transformedData;
+                int vectorSize = selectedIndices.Count;
+
                 if (modelType == ModelType.Regression)
                 {
                     var selectedRows = featureValuesList.Zip(targetValues, (features, target) =>
-                    new FeatureVector<float>
+                    new FixedFeatureVector<float>
                     {
                         Features = selectedIndices.Select(i => i < features.Length ? features[i] : 0)
                                                 .ToArray(),
                         Label = (float)target
                     }).ToList();
 
-                    transformedData = mlContext.Data.LoadFromEnumerable(selectedRows);
+                    // Load data with schema builder to specify fixed vector size
+                    var schemaBuilder = new DataViewSchema.Builder();
+                    schemaBuilder.AddColumn("Features", new VectorDataViewType(NumberDataViewType.Single, vectorSize));
+                    schemaBuilder.AddColumn("Label", NumberDataViewType.Single);
+                    var schema = schemaBuilder.ToSchema();
+
+                    transformedData = mlContext.Data.LoadFromEnumerable(selectedRows, schema);
                 }
                 else
                 {
                     var selectedRows = featureValuesList.Zip(targetValues, (features, target) =>
-                    new FeatureVector<long>
+                    new FixedFeatureVector<long>
                     {
                         Features = selectedIndices.Select(i => i < features.Length ? features[i] : 0)
                                                 .ToArray(),
                         Label = (long)target
                     }).ToList();
 
-                    transformedData = mlContext.Data.LoadFromEnumerable(selectedRows);
+                    // Load data with schema builder to specify fixed vector size
+                    var schemaBuilder = new DataViewSchema.Builder();
+                    schemaBuilder.AddColumn("Features", new VectorDataViewType(NumberDataViewType.Single, vectorSize));
+                    schemaBuilder.AddColumn("Label", NumberDataViewType.Int64);
+                    var schema = schemaBuilder.ToSchema();
+
+                    transformedData = mlContext.Data.LoadFromEnumerable(selectedRows, schema);
                 }
 
                 return (transformedData, selectedFeatures.ToArray(), _report.ToString());

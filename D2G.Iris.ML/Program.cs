@@ -11,6 +11,8 @@ using D2G.Iris.ML.Utils;
 using D2G.Iris.ML.Configuration;
 using D2G.Iris.ML.Data;
 using D2G.Iris.ML.Training;
+using D2G.Iris.ML.DataBalancing;
+using D2G.Iris.ML.FeatureEngineering;
 
 namespace D2G.Iris.ML
 {
@@ -45,14 +47,17 @@ namespace D2G.Iris.ML
 
                 var mlContext = new MLContext(seed: 42);
 
-                var dataProcessor = new DataProcessor(sqlHandler);
+                var dataBalancerFactory = new DataBalancerFactory();
+                var featureSelectorFactory = new FeatureSelectorFactory(mlContext);
+                var dataProcessor = new DataProcessor(sqlHandler, dataBalancerFactory, featureSelectorFactory);
                 var processedData = await dataProcessor.ProcessData(
                     mlContext,
                     rawData,
                     enabledFields,
                     config);
 
-                var modelTrainerFactory = new ModelTrainerFactory(mlContext);
+                var trainerFactory = new TrainerFactory(mlContext);
+                var modelTrainerFactory = new ModelTrainerFactory(mlContext, trainerFactory);
                 var modelTrainer = modelTrainerFactory.CreateTrainer(config.ModelType);
 
                 await modelTrainer.TrainModel(

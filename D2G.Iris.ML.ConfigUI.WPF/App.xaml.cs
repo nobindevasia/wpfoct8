@@ -7,6 +7,8 @@ using D2G.Iris.ML.Core.Interfaces;
 using D2G.Iris.ML.Configuration;
 using D2G.Iris.ML.Data;
 using D2G.Iris.ML.Training;
+using D2G.Iris.ML.DataBalancing;
+using D2G.Iris.ML.FeatureEngineering;
 using Microsoft.ML;
 using SciChart.Charting.Visuals;
 
@@ -33,14 +35,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF
 
             services.AddSingleton<ISqlHandler>(provider => new SqlHandler("DefaultTable"));
             services.AddSingleton<IDataLoader, DatabaseDataLoader>();
-            services.AddSingleton<IDataProcessor, DataProcessor>();
 
             services.AddSingleton<MLContext>();
+            services.AddSingleton<IDataBalancerFactory, DataBalancerFactory>();
+            services.AddSingleton<IFeatureSelectorFactory, FeatureSelectorFactory>();
+            services.AddSingleton<ITrainerFactory, TrainerFactory>();
+
+            services.AddSingleton<IDataProcessor, DataProcessor>();
             services.AddSingleton<IModelTrainerFactory, ModelTrainerFactory>();
 
             services.AddSingleton<IDatabaseAnalyticsService, DatabaseAnalyticsService>();
 
-            services.AddTransient<MainWindowViewModel>();
             services.AddTransient<GeneralSettingsViewModel>();
             services.AddTransient<DatabaseSettingsViewModel>();
             services.AddTransient<InputFieldsViewModel>();
@@ -48,8 +53,24 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<DataBalancingViewModel>();
             services.AddTransient<FeatureEngineeringViewModel>();
             services.AddTransient<AutoMLSettingsViewModel>();
-            services.AddTransient<ExploratoryDataAnalysisViewModel>();
+            services.AddTransient<DataProcessingPipelineViewModel>();
             services.AddTransient<TrainingLogsViewModel>();
+
+            // Child ViewModels for ExploratoryDataAnalysisViewModel
+            services.AddTransient<VisualisationViewModel>();
+            services.AddTransient<OutlierDetectionViewModel>();
+            services.AddTransient<ScatterPlotViewModel>();
+            services.AddTransient<ViolinPlotViewModel>();
+            services.AddTransient<BoxPlotViewModel>();
+            services.AddTransient<ExploratoryDataAnalysisViewModel>();
+
+            // Child ViewModels for PostTrainingVisualizationsViewModel
+            services.AddTransient<ConfusionMatrixViewModel>();
+            services.AddTransient<RocCurveViewModel>();
+            services.AddTransient<PrecisionRecallCurveViewModel>();
+            services.AddTransient<PostTrainingVisualizationsViewModel>();
+
+            services.AddTransient<MainWindowViewModel>();
 
             _serviceProvider = services.BuildServiceProvider();
 

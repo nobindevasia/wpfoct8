@@ -9,5 +9,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
         {
             InitializeComponent();
         }
+
+        private void AnalyzeDataButton_Click(object sender, System.Windows.RoutedEventArgs e)
+        {
+
+        }
     }
 }

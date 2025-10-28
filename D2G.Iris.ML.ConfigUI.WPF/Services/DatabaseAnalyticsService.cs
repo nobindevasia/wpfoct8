@@ -110,6 +110,31 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 foreach (var columnName in columns)
                 {
                     var hasDataType = dataTypes.TryGetValue(columnName, out var dataType);
+                    var isNumeric = hasDataType && IsNumericSqlType(dataType);
+
+                    // Skip non-numeric columns entirely for statistical analysis
+                    if (!isNumeric)
+                    {
+                        statistics.Add(new ColumnStatistics
+                        {
+                            ColumnName = columnName,
+                            DataType = dataType ?? "unknown",
+                            Count = 0,
+                            NonNullCount = 0,
+                            Mean = null,
+                            Min = null,
+                            Max = null,
+                            StdDev = null,
+                            Variance = null,
+                            Q1 = 0,
+                            Median = 0,
+                            Q3 = 0,
+                            Skewness = 0,
+                            Kurtosis = 0
+                        });
+                        continue;
+                    }
+
                     var shouldIncludePercentiles = includePercentiles && hasDataType && IsNumericSqlType(dataType);
                     var shouldIncludeMoments = includeMoments && hasDataType && IsNumericSqlType(dataType);
                     string query;
@@ -1176,13 +1201,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 case "money":
                 case "smallmoney":
                 case "bit":
+                    return true;
+                // Exclude date/time and GUID types - they cannot be cast to FLOAT
                 case "date":
                 case "datetime":
                 case "datetime2":
                 case "datetimeoffset":
                 case "smalldatetime":
                 case "time":
-                    return true;
+                case "uniqueidentifier":
+                case "char":
+                case "varchar":
+                case "nchar":
+                case "nvarchar":
+                case "text":
+                case "ntext":
+                    return false;
                 default:
                     return false;
             }

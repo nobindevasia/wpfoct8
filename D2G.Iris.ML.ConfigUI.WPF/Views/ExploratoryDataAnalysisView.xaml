@@ -11,102 +11,189 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,15"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="BorderBrush" Value="#D0D0D0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+        </Style>
     </UserControl.Resources>
-    <Grid>
+
+    <Grid Background="#F5F5F5">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Exploratory Data Analysis" FontSize="18" FontWeight="Bold" Margin="10" />
+        <!-- Header -->
+        <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="20,15">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <TabControl Grid.Row="1" Margin="10">
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="Exploratory Data Analysis"
+                               FontSize="20"
+                               FontWeight="SemiBold"
+                               Foreground="#2C3E50"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock Text="Rows: " FontSize="12" Foreground="#7F8C8D"/>
+                        <TextBlock Text="{Binding NumberOfRows, StringFormat={}{0:N0}}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#34495E"
+                                   Margin="0,0,20,0"/>
+                        <TextBlock Text="Columns: " FontSize="12" Foreground="#829091ff"/>
+                        <TextBlock Text="{Binding NumberOfColumns, StringFormat={}{0:N0}}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="#34495E"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Content="Analyze Data"
+                        Command="{Binding AnalyzeDataCommand}"
+                        Background="#3498DB"
+                        Foreground="White"
+                        BorderBrush="#3498DB"
+                        Padding="20,10"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        Cursor="Hand"/>
+            </Grid>
+        </Border>
+
+        <TabControl Grid.Row="1" Margin="15" Background="Transparent" BorderThickness="0">
             <TabItem Header="Data Summary">
-                <Grid>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
-                        <StackPanel Margin="10">
-                            <Button Content="Analyze Data" Command="{Binding AnalyzeDataCommand}" 
-                                    Width="120" Height="30" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+                <Border Background="White" BorderBrush="#E0E0E0" BorderThickness="1" Margin="0,5,0,0">
+                    <Grid>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding IsLoading, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                            <StackPanel Margin="20">
+                                <GroupBox Header="Data Shape">
+                                    <UniformGrid Columns="2" HorizontalAlignment="Left">
+                                        <Border Background="#E8F5E9" BorderBrush="#27AE60" BorderThickness="0,0,0,3"
+                                                Padding="15,12" Margin="0,0,10,0">
+                                            <StackPanel>
+                                                <TextBlock Text="Rows" FontSize="11" Foreground="#27AE60" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding NumberOfRows, StringFormat={}{0:N0}}"
+                                                           FontSize="24"
+                                                           FontWeight="Bold"
+                                                           Foreground="#27AE60"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="#E3F2FD" BorderBrush="#3498DB" BorderThickness="0,0,0,3"
+                                                Padding="15,12">
+                                            <StackPanel>
+                                                <TextBlock Text="Columns" FontSize="11" Foreground="#3498DB" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding NumberOfColumns, StringFormat={}{0:N0}}"
+                                                           FontSize="24"
+                                                           FontWeight="Bold"
+                                                           Foreground="#3498DB"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+                                </GroupBox>
 
-                            <GroupBox Header="Data Shape" Margin="0,0,0,10">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Number of Rows:" Margin="5" FontWeight="Bold"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding NumberOfRows}" Margin="5"/>
-
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Number of Columns:" Margin="5" FontWeight="Bold"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding NumberOfColumns}" Margin="5"/>
-                                </Grid>
-                            </GroupBox>
-
-                            <GroupBox Header="Feature Types" Margin="0,0,0,10">
-                                <ItemsControl ItemsSource="{Binding FeatureTypes}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Margin="5,2">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="150"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0" Text="{Binding Type}" FontWeight="Bold"/>
-                                                <TextBlock Grid.Column="1" Text="{Binding Count}"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </GroupBox>
+                                <GroupBox Header="Feature Types">
+                                    <ItemsControl ItemsSource="{Binding FeatureTypes}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel/>
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Background="#F8F9FA" BorderBrush="#DEE2E6" BorderThickness="1"
+                                                        Padding="12,8" Margin="0,0,8,8" CornerRadius="4">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <TextBlock Text="{Binding Type}"
+                                                                   FontWeight="SemiBold"
+                                                                   FontSize="12"
+                                                                   Foreground="#495057"
+                                                                   Margin="0,0,10,0"/>
+                                                        <Border Background="#6C757D" CornerRadius="10" Padding="8,3">
+                                                            <TextBlock Text="{Binding Count}"
+                                                                       FontWeight="Bold"
+                                                                       FontSize="11"
+                                                                       Foreground="White"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </GroupBox>
 
                             <GroupBox Header="Missing Values Analysis" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Margin="5,0,5,10"
-                                               Text="Analyzes NULL values in the dataset - empty strings and zeros are considered valid data"
-                                               FontStyle="Italic"
-                                               Foreground="Gray"/>
-                                    <Grid Margin="5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Total Missing Values:" FontWeight="Bold"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding TotalMissingValues}"/>
-                                    </Grid>
-                                    
-                                    <Grid Margin="5">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="200"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="Missing Values Percentage:" FontWeight="Bold"/>
-                                        <TextBlock Grid.Column="1" Text="{Binding MissingValuesPercentage, StringFormat={}{0:F2}%}"/>
-                                    </Grid>
+                                    <Border Background="#FFF8E1" BorderBrush="#FFC107" BorderThickness="1"
+                                            Padding="12,8" Margin="0,0,0,15" CornerRadius="4">
+                                        <TextBlock Text="Analyzes NULL values in the dataset - empty strings and zeros are considered valid data"
+                                                   FontSize="11"
+                                                   Foreground="#856404"
+                                                   TextWrapping="Wrap"/>
+                                    </Border>
 
-                                    <TextBlock Text="Per-Column Missing Values:" FontWeight="Bold" Margin="5,10,5,5"/>
-                                    <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                                        <ItemsControl ItemsSource="{Binding ColumnMissingValues}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid Margin="5,2">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="200"/>
-                                                            <ColumnDefinition Width="80"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="{Binding ColumnName}"/>
-                                                        <TextBlock Grid.Column="1" Text="{Binding MissingCount}"/>
-                                                        <TextBlock Grid.Column="2" Text="{Binding MissingPercentage, StringFormat=({0:F2}%)}"/>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </ScrollViewer>
+                                    <UniformGrid Columns="2" Margin="0,0,0,15">
+                                        <Border Background="#FFF3CD" BorderBrush="#FFC107" BorderThickness="0,0,0,3"
+                                                Padding="15,12" Margin="0,0,10,0">
+                                            <StackPanel>
+                                                <TextBlock Text="Total Missing" FontSize="11" Foreground="#856404" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding TotalMissingValues}"
+                                                           FontSize="24"
+                                                           FontWeight="Bold"
+                                                           Foreground="#856404"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Background="#F8D7DA" BorderBrush="#DC3556" BorderThickness="0,0,0,3"
+                                                Padding="15,12">
+                                            <StackPanel>
+                                                <TextBlock Text="Percentage" FontSize="11" Foreground="#721C24" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding MissingValuesPercentage, StringFormat={}{0:F2}%}"
+                                                           FontSize="24"
+                                                           FontWeight="Bold"
+                                                           Foreground="#7c2e36ff"
+                                                           Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </UniformGrid>
+
+                                    <TextBlock Text="Per-Column Missing Values:" FontWeight="SemiBold" FontSize="12" Margin="0,5,0,10"/>
+                                    <Border BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4">
+                                        <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding ColumnMissingValues}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="#F0F0F0" BorderThickness="0,0,0,1" Padding="12,8">
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                    <ColumnDefinition Width="Auto"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBlock Grid.Column="0" Text="{Binding ColumnName}"
+                                                                           FontWeight="SemiBold" FontSize="11" Foreground="#34495E"/>
+                                                                <TextBlock Grid.Column="1" Text="{Binding MissingCount}"
+                                                                           FontSize="11" Foreground="#7F8C8D" Margin="0,0,15,0"/>
+                                                                <Border Grid.Column="2" Background="#FEE" Padding="6,3" CornerRadius="3">
+                                                                    <TextBlock Text="{Binding MissingPercentage, StringFormat={}{0:F2}%}"
+                                                                               FontSize="10" FontWeight="SemiBold" Foreground="#DC3545"/>
+                                                                </Border>
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                    </Border>
                                 </StackPanel>
                             </GroupBox>
                         </StackPanel>
@@ -150,7 +237,7 @@
                                     </EventTrigger>
                                 </Ellipse.Triggers>
                             </Ellipse>
-                            
+                        
                             <Ellipse x:Name="Dot3" Width="12" Height="12" Fill="#007ACC">
                                 <Ellipse.Resources>
                                     <Storyboard x:Key="BounceStoryboard3" RepeatBehavior="Forever">
@@ -169,13 +256,14 @@
                                 </Ellipse.Triggers>
                             </Ellipse>
                         </StackPanel>
-                        
+
                         <TextBlock Text="{Binding LoadingMessage}" FontSize="14" FontWeight="Medium"
                                    HorizontalAlignment="Center" TextAlignment="Center" Foreground="#333"/>
                     </StackPanel>
                 </Grid>
+            </Border>
             </TabItem>
-            
+
             <TabItem Header="Histograms">
                 <views:VisualisationView DataContext="{Binding VisualisationViewModel}"/>
             </TabItem>

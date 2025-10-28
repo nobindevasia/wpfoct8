@@ -64,12 +64,14 @@
                      VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
                      Visibility="{Binding IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
-            
+
             <Label Grid.Row="8" Grid.Column="0" Content="Multicollinearity Threshold:" VerticalAlignment="Center"
                    Visibility="{Binding IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
-            <TextBox Grid.Row="8" Grid.Column="1" 
-                     Text="{Binding MulticollinearityThreshold, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}" 
+            <TextBox Grid.Row="8" Grid.Column="1"
+                     Text="{Binding MulticollinearityThresholdText, UpdateSourceTrigger=PropertyChanged}"
                      VerticalAlignment="Center" Height="25" Width="80" HorizontalAlignment="Left"
+                     PreviewTextInput="DecimalTextBox_PreviewTextInput"
+                     DataObject.Pasting="DecimalTextBox_Pasting"
                      Visibility="{Binding IsCorrelationSelected, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
             

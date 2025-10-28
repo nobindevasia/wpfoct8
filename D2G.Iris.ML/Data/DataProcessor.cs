@@ -13,15 +13,18 @@ namespace D2G.Iris.ML.Data
 {
     public class DataProcessor : IDataProcessor
     {
-        private readonly DataBalancerFactory _dataBalancerFactory;
-        private readonly FeatureSelectorFactory _featureSelectorFactory;
+        private readonly IDataBalancerFactory _dataBalancerFactory;
+        private readonly IFeatureSelectorFactory _featureSelectorFactory;
         private readonly ISqlHandler _sqlHandler;
 
-        public DataProcessor(ISqlHandler sqlHandler)
+        public DataProcessor(
+            ISqlHandler sqlHandler,
+            IDataBalancerFactory dataBalancerFactory,
+            IFeatureSelectorFactory featureSelectorFactory)
         {
-            _dataBalancerFactory = new DataBalancerFactory();
-            _featureSelectorFactory = new FeatureSelectorFactory(new MLContext());
             _sqlHandler = sqlHandler;
+            _dataBalancerFactory = dataBalancerFactory;
+            _featureSelectorFactory = featureSelectorFactory;
         }
 
         public async Task<ProcessedData> ProcessData(
@@ -184,8 +187,7 @@ namespace D2G.Iris.ML.Data
             string[] features,
             ModelConfig config)
         {
-            var featureSelectorFactory = _featureSelectorFactory ?? new FeatureSelectorFactory(mlContext);
-            var selector = featureSelectorFactory.CreateSelector(config.FeatureEngineering.Method);
+            var selector = _featureSelectorFactory.CreateSelector(config.FeatureEngineering.Method);
 
             var result = await selector.SelectFeatures(
                 mlContext,

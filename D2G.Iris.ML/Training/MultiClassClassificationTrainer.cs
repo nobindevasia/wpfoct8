@@ -15,7 +15,7 @@ namespace D2G.Iris.ML.Training
 
     public class MultiClassClassificationTrainer : BaseModelTrainer
     {
-        public MultiClassClassificationTrainer(MLContext mlContext, TrainerFactory trainerFactory)
+        public MultiClassClassificationTrainer(MLContext mlContext, ITrainerFactory trainerFactory)
             : base(mlContext, trainerFactory)
         {
         }

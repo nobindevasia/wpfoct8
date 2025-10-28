@@ -6,7 +6,7 @@ using D2G.Iris.ML.DataBalancing;
 
 namespace D2G.Iris.ML.DataBalancing
 {
-    public class DataBalancerFactory
+    public class DataBalancerFactory : IDataBalancerFactory
     {
         public IDataBalancer CreateBalancer(DataBalanceMethod method)
         {

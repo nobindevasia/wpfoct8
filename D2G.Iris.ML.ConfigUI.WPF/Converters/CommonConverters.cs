@@ -33,16 +33,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Converters
         {
             if (value is decimal decimalValue)
             {
-                return decimalValue.ToString(culture);
+                return decimalValue == 0m ? string.Empty : decimalValue.ToString(CultureInfo.InvariantCulture);
             }
-            return "0";
+            return string.Empty;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value is string stringValue && decimal.TryParse(stringValue, NumberStyles.Any, culture, out decimal result))
+            if (value is string stringValue)
             {
-                return result;
+                if (string.IsNullOrWhiteSpace(stringValue))
+                    return 0m;
+
+                if (decimal.TryParse(stringValue, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal result))
+                {
+                    return result;
+                }
             }
             return 0m;
         }

@@ -35,7 +35,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Commands
         {
             _execute(parameter);
         }
-
+        
         public void RaiseCanExecuteChanged()
         {
             CommandManager.InvalidateRequerySuggested();

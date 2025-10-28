@@ -21,10 +21,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private Func<DatabaseConfig?>? _getDatabaseConfig;
         private Func<string>? _getTargetField;
 
-        public InputFieldsViewModel(IDialogService dialogService)
+        public InputFieldsViewModel(IDialogService dialogService, IDatabaseSchemaLoader schemaLoader)
         {
             _dialogService = dialogService;
-            _schemaLoader = new DatabaseSchemaLoader();
+            _schemaLoader = schemaLoader;
             InputFields = new ObservableCollection<InputFieldItem>();
             InputFields.CollectionChanged += (s, e) =>
             {

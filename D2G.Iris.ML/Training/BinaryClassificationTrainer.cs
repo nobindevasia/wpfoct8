@@ -17,7 +17,7 @@ namespace D2G.Iris.ML.Training
 
 
 
-        public BinaryClassificationTrainer(MLContext mlContext, TrainerFactory trainerFactory)
+        public BinaryClassificationTrainer(MLContext mlContext, ITrainerFactory trainerFactory)
             : base(mlContext, trainerFactory)
         {
         }
@@ -159,11 +159,27 @@ namespace D2G.Iris.ML.Training
                 mlContext.Model.Save(bestRun.Model, preparedData.Schema, modelPath);
                 Console.WriteLine($"\nModel saved to: {modelPath}");
 
+                // Calculate ROC curve using validation data (AutoML already split the data)
+                Console.WriteLine("\nCalculating ROC curve...");
+                var rocData = CalculateRocCurve(mlContext, bestRun.Model, preparedData);
+
+                // Calculate Precision-Recall curve
+                Console.WriteLine("\nCalculating Precision-Recall curve...");
+                var prData = CalculatePrecisionRecallCurve(mlContext, bestRun.Model, preparedData);
+
                 return new TrainingResult
                 {
                     Model = bestRun.Model,
                     Metrics = bestRun.ValidationMetrics,
-                    AlgorithmUsed = cleanTrainerName
+                    AlgorithmUsed = cleanTrainerName,
+                    RocCurveFpr = rocData.fpr,
+                    RocCurveTpr = rocData.tpr,
+                    RocCurveThresholds = rocData.thresholds,
+                    AucScore = bestRun.ValidationMetrics.AreaUnderRocCurve,
+                    PrecisionRecallPrecision = prData.precision,
+                    PrecisionRecallRecall = prData.recall,
+                    PrecisionRecallThresholds = prData.thresholds,
+                    AveragePrecision = prData.averagePrecision
                 };
             }
             catch (Exception ex)
@@ -302,11 +318,27 @@ namespace D2G.Iris.ML.Training
     featureNames,
     Core.Enums.ModelType.BinaryClassification);
 
+            // Calculate ROC curve using test data
+            Console.WriteLine("\nCalculating ROC curve...");
+            var rocData = CalculateRocCurve(mlContext, model, split.TestSet);
+
+            // Calculate Precision-Recall curve
+            Console.WriteLine("\nCalculating Precision-Recall curve...");
+            var prData = CalculatePrecisionRecallCurve(mlContext, model, split.TestSet);
+
             return new TrainingResult
             {
                 Model = model,
                 Metrics = metrics,
-                AlgorithmUsed = config.TrainingParameters.Algorithm
+                AlgorithmUsed = config.TrainingParameters.Algorithm,
+                RocCurveFpr = rocData.fpr,
+                RocCurveTpr = rocData.tpr,
+                RocCurveThresholds = rocData.thresholds,
+                AucScore = metrics.AreaUnderRocCurve,
+                PrecisionRecallPrecision = prData.precision,
+                PrecisionRecallRecall = prData.recall,
+                PrecisionRecallThresholds = prData.thresholds,
+                AveragePrecision = prData.averagePrecision
             };
         }
         private class BinaryVector
@@ -314,6 +346,204 @@ namespace D2G.Iris.ML.Training
             [VectorType]
             public float[] Features { get; set; }
             public bool Label { get; set; }
+        }
+
+        private class BinaryPrediction
+        {
+            public bool PredictedLabel { get; set; }
+            public float Score { get; set; }
+            public float Probability { get; set; }
+        }
+
+        /// <summary>
+        /// Calculates ROC curve data from the test set predictions
+        /// </summary>
+        private (List<double> fpr, List<double> tpr, List<double> thresholds) CalculateRocCurve(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView testData)
+        {
+            try
+            {
+                // Get predictions with probabilities
+                var predictions = model.Transform(testData);
+                var predictionData = mlContext.Data.CreateEnumerable<BinaryPredictionWithLabel>(predictions, reuseRowObject: false).ToList();
+
+                if (predictionData.Count == 0)
+                {
+                    Console.WriteLine("Warning: No predictions available for ROC curve calculation");
+                    return (new List<double>(), new List<double>(), new List<double>());
+                }
+
+                // Sort by probability descending
+                var sortedPredictions = predictionData.OrderByDescending(p => p.Probability).ToList();
+
+                var fpr = new List<double>();
+                var tpr = new List<double>();
+                var thresholds = new List<double>();
+
+                // Calculate total positives and negatives
+                int totalPositives = sortedPredictions.Count(p => p.Label);
+                int totalNegatives = sortedPredictions.Count(p => !p.Label);
+
+                if (totalPositives == 0 || totalNegatives == 0)
+                {
+                    Console.WriteLine("Warning: Dataset contains only one class, cannot calculate ROC curve");
+                    return (new List<double>(), new List<double>(), new List<double>());
+                }
+
+                // Add point at (0, 0) for threshold = 1.0
+                fpr.Add(0.0);
+                tpr.Add(0.0);
+                thresholds.Add(1.0);
+
+                int truePositives = 0;
+                int falsePositives = 0;
+
+                // Generate ROC curve points
+                for (int i = 0; i < sortedPredictions.Count; i++)
+                {
+                    var pred = sortedPredictions[i];
+
+                    // Update counters
+                    if (pred.Label)
+                        truePositives++;
+                    else
+                        falsePositives++;
+
+                    // Calculate rates
+                    double currentTpr = (double)truePositives / totalPositives;
+                    double currentFpr = (double)falsePositives / totalNegatives;
+
+                    // Only add point if it's different from the last point (avoid duplicates)
+                    if (i == sortedPredictions.Count - 1 ||
+                        Math.Abs(pred.Probability - sortedPredictions[i + 1].Probability) > 1e-10)
+                    {
+                        tpr.Add(currentTpr);
+                        fpr.Add(currentFpr);
+                        thresholds.Add(pred.Probability);
+                    }
+                }
+
+                // Add point at (1, 1) for threshold = 0.0
+                if (fpr[fpr.Count - 1] != 1.0 || tpr[tpr.Count - 1] != 1.0)
+                {
+                    fpr.Add(1.0);
+                    tpr.Add(1.0);
+                    thresholds.Add(0.0);
+                }
+
+                Console.WriteLine($"ROC curve calculated with {fpr.Count} points");
+                return (fpr, tpr, thresholds);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calculating ROC curve: {ex.Message}");
+                return (new List<double>(), new List<double>(), new List<double>());
+            }
+        }
+
+        /// <summary>
+        /// Calculates Precision-Recall curve data from the test set predictions
+        /// </summary>
+        private (List<double> precision, List<double> recall, List<double> thresholds, double averagePrecision) CalculatePrecisionRecallCurve(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView testData)
+        {
+            try
+            {
+                // Get predictions with probabilities
+                var predictions = model.Transform(testData);
+                var predictionData = mlContext.Data.CreateEnumerable<BinaryPredictionWithLabel>(predictions, reuseRowObject: false).ToList();
+
+                if (predictionData.Count == 0)
+                {
+                    Console.WriteLine("Warning: No predictions available for PR curve calculation");
+                    return (new List<double>(), new List<double>(), new List<double>(), 0.0);
+                }
+
+                // Sort by probability descending
+                var sortedPredictions = predictionData.OrderByDescending(p => p.Probability).ToList();
+
+                var precision = new List<double>();
+                var recall = new List<double>();
+                var thresholds = new List<double>();
+
+                // Calculate total positives
+                int totalPositives = sortedPredictions.Count(p => p.Label);
+
+                if (totalPositives == 0)
+                {
+                    Console.WriteLine("Warning: Dataset contains no positive samples, cannot calculate PR curve");
+                    return (new List<double>(), new List<double>(), new List<double>(), 0.0);
+                }
+
+                // Add starting point at recall=0
+                // When no samples are predicted positive (threshold=1.0), precision is undefined
+                // Following sklearn convention: set precision to 1.0 at recall=0
+                // This represents perfect precision when making no predictions
+                precision.Add(1.0);
+                recall.Add(0.0);
+                thresholds.Add(1.0);
+
+                int truePositives = 0;
+                int falsePositives = 0;
+
+                // Generate PR curve points
+                for (int i = 0; i < sortedPredictions.Count; i++)
+                {
+                    var pred = sortedPredictions[i];
+
+                    // Update counters
+                    if (pred.Label)
+                        truePositives++;
+                    else
+                        falsePositives++;
+
+                    // Calculate precision and recall
+                    double currentRecall = (double)truePositives / totalPositives;
+                    double currentPrecision = (truePositives + falsePositives) > 0
+                        ? (double)truePositives / (truePositives + falsePositives)
+                        : 0.0;
+
+                    // Only add point if it's different from the last point (avoid duplicates)
+                    if (i == sortedPredictions.Count - 1 ||
+                        Math.Abs(pred.Probability - sortedPredictions[i + 1].Probability) > 1e-10)
+                    {
+                        precision.Add(currentPrecision);
+                        recall.Add(currentRecall);
+                        thresholds.Add(pred.Probability);
+                    }
+                }
+
+                // Calculate Average Precision (AP) using right Riemann sum
+                // This matches the standard method used by scikit-learn
+                double ap = 0.0;
+                for (int i = 1; i < recall.Count; i++)
+                {
+                    double recallDiff = recall[i] - recall[i - 1];
+                    // Use current precision (not average) for right Riemann sum
+                    ap += recallDiff * precision[i];
+                }
+
+                Console.WriteLine($"Precision-Recall curve calculated with {precision.Count} points");
+                Console.WriteLine($"Average Precision (AP): {ap:F4}");
+                return (precision, recall, thresholds, ap);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calculating Precision-Recall curve: {ex.Message}");
+                return (new List<double>(), new List<double>(), new List<double>(), 0.0);
+            }
+        }
+
+        private class BinaryPredictionWithLabel
+        {
+            public bool Label { get; set; }
+            public bool PredictedLabel { get; set; }
+            public float Score { get; set; }
+            public float Probability { get; set; }
         }
 
         private IDataView PrepareData(IDataView labeledData, string[] featureNames)

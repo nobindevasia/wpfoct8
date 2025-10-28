@@ -186,13 +186,16 @@ namespace D2G.Iris.ML.DataBalancing
         private void ValidateConfig(DataBalancingConfig config)
         {
             if (config.UndersamplingRatio <= 0 || config.UndersamplingRatio > 1)
-                throw new ArgumentException("Undersampling ratio must be between 0 and 1");
+                throw new ArgumentException("Undersampling ratio must be between 0 (exclusive) and 1 (inclusive)");
 
             if (config.MinorityToMajorityRatio <= 0 || config.MinorityToMajorityRatio > 1)
-                throw new ArgumentException("Minority to majority ratio must be between 0 and 1");
+                throw new ArgumentException("Minority to majority ratio must be between 0 (exclusive) and 1 (inclusive)");
 
             if (config.KNeighbors < 1)
-                throw new ArgumentException("K should be greater than 0");
+                throw new ArgumentException("K Neighbors must be at least 1");
+
+            if (config.KNeighbors > 20)
+                throw new ArgumentException("K Neighbors should not exceed 20 for performance reasons");
         }
 
         private async Task<List<float[]>> GenerateSyntheticSamples(

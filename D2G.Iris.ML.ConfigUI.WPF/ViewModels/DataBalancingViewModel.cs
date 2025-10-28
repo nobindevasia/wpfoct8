@@ -10,9 +10,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         private DataBalanceMethod _selectedMethod = DataBalanceMethod.None;
         private int _executionOrder = 1;
-        private int _kNeighbors = 5;
-        private decimal _undersamplingRatio = 0.9m;
-        private decimal _minorityToMajorityRatio = 0.1m;
+        private int _kNeighbors = 0;  // No default - user must enter value
+        private decimal _undersamplingRatio = 0.0m;  // No default - user must enter value
+        private decimal _minorityToMajorityRatio = 0.0m;  // No default - user must enter value
+        private string _undersamplingRatioText = "";
+        private string _minorityToMajorityRatioText = "";
         private string _description = "No data balancing will be applied.";
 
         public DataBalancingViewModel()
@@ -45,19 +47,73 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public int KNeighbors
         {
             get => _kNeighbors;
-            set => SetProperty(ref _kNeighbors, Math.Max(1, Math.Min(20, value)));
+            set
+            {
+                // Allow any value during typing, validate on GetConfiguration()
+                SetProperty(ref _kNeighbors, value);
+            }
         }
 
         public decimal UndersamplingRatio
         {
             get => _undersamplingRatio;
-            set => SetProperty(ref _undersamplingRatio, Math.Max(0.1m, Math.Min(1.0m, value)));
+            set
+            {
+                // Allow any value during typing, validate on GetConfiguration()
+                SetProperty(ref _undersamplingRatio, value);
+            }
+        }
+
+        public string UndersamplingRatioText
+        {
+            get => _undersamplingRatioText;
+            set
+            {
+                if (SetProperty(ref _undersamplingRatioText, value))
+                {
+                    // Try to parse and update the decimal value
+                    if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal result))
+                    {
+                        _undersamplingRatio = result;
+                    }
+                    else if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _undersamplingRatio = 0m;
+                    }
+                }
+            }
         }
 
         public decimal MinorityToMajorityRatio
         {
             get => _minorityToMajorityRatio;
-            set => SetProperty(ref _minorityToMajorityRatio, Math.Max(0.01m, Math.Min(1.0m, value)));
+            set
+            {
+                // Allow any value during typing, validate on GetConfiguration()
+                SetProperty(ref _minorityToMajorityRatio, value);
+            }
+        }
+
+        public string MinorityToMajorityRatioText
+        {
+            get => _minorityToMajorityRatioText;
+            set
+            {
+                if (SetProperty(ref _minorityToMajorityRatioText, value))
+                {
+                    // Try to parse and update the decimal value
+                    if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal result))
+                    {
+                        _minorityToMajorityRatio = result;
+                    }
+                    else if (string.IsNullOrWhiteSpace(value))
+                    {
+                        _minorityToMajorityRatio = 0m;
+                    }
+                }
+            }
         }
 
         public string Description
@@ -91,9 +147,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 SelectedMethod = DataBalanceMethod.None;
                 ExecutionOrder = 1;
-                KNeighbors = 5;
-                UndersamplingRatio = 0.9m;
-                MinorityToMajorityRatio = 0.1m;
+                KNeighbors = 0;
+                UndersamplingRatio = 0.0m;
+                MinorityToMajorityRatio = 0.0m;
+                UndersamplingRatioText = "";
+                MinorityToMajorityRatioText = "";
                 return;
             }
 
@@ -102,10 +160,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             KNeighbors = config.KNeighbors;
             UndersamplingRatio = (decimal)config.UndersamplingRatio;
             MinorityToMajorityRatio = (decimal)config.MinorityToMajorityRatio;
+            UndersamplingRatioText = config.UndersamplingRatio > 0 ? config.UndersamplingRatio.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+            MinorityToMajorityRatioText = config.MinorityToMajorityRatio > 0 ? config.MinorityToMajorityRatio.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
         }
 
         public DataBalancingConfig GetConfiguration()
         {
+            // Return values exactly as entered by user - no validation or clamping
             return new DataBalancingConfig
             {
                 Method = SelectedMethod,

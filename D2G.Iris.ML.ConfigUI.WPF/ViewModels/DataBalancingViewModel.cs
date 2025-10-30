@@ -10,9 +10,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         private DataBalanceMethod _selectedMethod = DataBalanceMethod.None;
         private int _executionOrder = 1;
-        private int _kNeighbors = 0;  // No default - user must enter value
-        private decimal _undersamplingRatio = 0.0m;  // No default - user must enter value
-        private decimal _minorityToMajorityRatio = 0.0m;  // No default - user must enter value
+        private int _kNeighbors = 0;
+        private decimal _undersamplingRatio = 0.0m;
+        private decimal _minorityToMajorityRatio = 0.0m;
         private string _undersamplingRatioText = "";
         private string _minorityToMajorityRatioText = "";
         private string _description = "No data balancing will be applied.";
@@ -49,7 +49,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             get => _kNeighbors;
             set
             {
-                // Allow any value during typing, validate on GetConfiguration()
+
                 SetProperty(ref _kNeighbors, value);
             }
         }
@@ -59,7 +59,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             get => _undersamplingRatio;
             set
             {
-                // Allow any value during typing, validate on GetConfiguration()
+
                 SetProperty(ref _undersamplingRatio, value);
             }
         }
@@ -71,7 +71,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 if (SetProperty(ref _undersamplingRatioText, value))
                 {
-                    // Try to parse and update the decimal value
+
                     if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out decimal result))
                     {
@@ -90,7 +90,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             get => _minorityToMajorityRatio;
             set
             {
-                // Allow any value during typing, validate on GetConfiguration()
+
                 SetProperty(ref _minorityToMajorityRatio, value);
             }
         }
@@ -102,7 +102,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 if (SetProperty(ref _minorityToMajorityRatioText, value))
                 {
-                    // Try to parse and update the decimal value
+
                     if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out decimal result))
                     {
@@ -166,7 +166,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public DataBalancingConfig GetConfiguration()
         {
-            // Return values exactly as entered by user - no validation or clamping
+
             return new DataBalancingConfig
             {
                 Method = SelectedMethod,

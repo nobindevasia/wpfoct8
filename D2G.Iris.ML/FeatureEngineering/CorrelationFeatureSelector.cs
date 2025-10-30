@@ -174,7 +174,7 @@ namespace D2G.Iris.ML.FeatureEngineering
                     _report.AppendLine($"- {feature} (correlation with target: {targetCorrelations[feature]:F4})");
                 }
 
-                // Create the transformedData with proper fixed-size vector
+
                 IDataView transformedData;
                 int vectorSize = selectedIndices.Count;
 
@@ -188,7 +188,7 @@ namespace D2G.Iris.ML.FeatureEngineering
                         Label = (float)target
                     }).ToList();
 
-                    // Load data with schema builder to specify fixed vector size
+
                     var schemaBuilder = new DataViewSchema.Builder();
                     schemaBuilder.AddColumn("Features", new VectorDataViewType(NumberDataViewType.Single, vectorSize));
                     schemaBuilder.AddColumn("Label", NumberDataViewType.Single);
@@ -206,7 +206,7 @@ namespace D2G.Iris.ML.FeatureEngineering
                         Label = (long)target
                     }).ToList();
 
-                    // Load data with schema builder to specify fixed vector size
+
                     var schemaBuilder = new DataViewSchema.Builder();
                     schemaBuilder.AddColumn("Features", new VectorDataViewType(NumberDataViewType.Single, vectorSize));
                     schemaBuilder.AddColumn("Label", NumberDataViewType.Int64);

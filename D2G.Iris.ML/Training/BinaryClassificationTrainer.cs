@@ -159,11 +159,11 @@ namespace D2G.Iris.ML.Training
                 mlContext.Model.Save(bestRun.Model, preparedData.Schema, modelPath);
                 Console.WriteLine($"\nModel saved to: {modelPath}");
 
-                // Calculate ROC curve using validation data (AutoML already split the data)
+
                 Console.WriteLine("\nCalculating ROC curve...");
                 var rocData = CalculateRocCurve(mlContext, bestRun.Model, preparedData);
 
-                // Calculate Precision-Recall curve
+
                 Console.WriteLine("\nCalculating Precision-Recall curve...");
                 var prData = CalculatePrecisionRecallCurve(mlContext, bestRun.Model, preparedData);
 
@@ -318,11 +318,11 @@ namespace D2G.Iris.ML.Training
     featureNames,
     Core.Enums.ModelType.BinaryClassification);
 
-            // Calculate ROC curve using test data
+
             Console.WriteLine("\nCalculating ROC curve...");
             var rocData = CalculateRocCurve(mlContext, model, split.TestSet);
 
-            // Calculate Precision-Recall curve
+
             Console.WriteLine("\nCalculating Precision-Recall curve...");
             var prData = CalculatePrecisionRecallCurve(mlContext, model, split.TestSet);
 
@@ -355,9 +355,9 @@ namespace D2G.Iris.ML.Training
             public float Probability { get; set; }
         }
 
-        /// <summary>
-        /// Calculates ROC curve data from the test set predictions
-        /// </summary>
+
+
+
         private (List<double> fpr, List<double> tpr, List<double> thresholds) CalculateRocCurve(
             MLContext mlContext,
             ITransformer model,
@@ -365,7 +365,7 @@ namespace D2G.Iris.ML.Training
         {
             try
             {
-                // Get predictions with probabilities
+
                 var predictions = model.Transform(testData);
                 var predictionData = mlContext.Data.CreateEnumerable<BinaryPredictionWithLabel>(predictions, reuseRowObject: false).ToList();
 
@@ -375,14 +375,14 @@ namespace D2G.Iris.ML.Training
                     return (new List<double>(), new List<double>(), new List<double>());
                 }
 
-                // Sort by probability descending
+
                 var sortedPredictions = predictionData.OrderByDescending(p => p.Probability).ToList();
 
                 var fpr = new List<double>();
                 var tpr = new List<double>();
                 var thresholds = new List<double>();
 
-                // Calculate total positives and negatives
+
                 int totalPositives = sortedPredictions.Count(p => p.Label);
                 int totalNegatives = sortedPredictions.Count(p => !p.Label);
 
@@ -392,7 +392,7 @@ namespace D2G.Iris.ML.Training
                     return (new List<double>(), new List<double>(), new List<double>());
                 }
 
-                // Add point at (0, 0) for threshold = 1.0
+
                 fpr.Add(0.0);
                 tpr.Add(0.0);
                 thresholds.Add(1.0);
@@ -400,22 +400,22 @@ namespace D2G.Iris.ML.Training
                 int truePositives = 0;
                 int falsePositives = 0;
 
-                // Generate ROC curve points
+
                 for (int i = 0; i < sortedPredictions.Count; i++)
                 {
                     var pred = sortedPredictions[i];
 
-                    // Update counters
+
                     if (pred.Label)
                         truePositives++;
                     else
                         falsePositives++;
 
-                    // Calculate rates
+
                     double currentTpr = (double)truePositives / totalPositives;
                     double currentFpr = (double)falsePositives / totalNegatives;
 
-                    // Only add point if it's different from the last point (avoid duplicates)
+
                     if (i == sortedPredictions.Count - 1 ||
                         Math.Abs(pred.Probability - sortedPredictions[i + 1].Probability) > 1e-10)
                     {
@@ -425,7 +425,7 @@ namespace D2G.Iris.ML.Training
                     }
                 }
 
-                // Add point at (1, 1) for threshold = 0.0
+
                 if (fpr[fpr.Count - 1] != 1.0 || tpr[tpr.Count - 1] != 1.0)
                 {
                     fpr.Add(1.0);
@@ -443,9 +443,9 @@ namespace D2G.Iris.ML.Training
             }
         }
 
-        /// <summary>
-        /// Calculates Precision-Recall curve data from the test set predictions
-        /// </summary>
+
+
+
         private (List<double> precision, List<double> recall, List<double> thresholds, double averagePrecision) CalculatePrecisionRecallCurve(
             MLContext mlContext,
             ITransformer model,
@@ -453,7 +453,7 @@ namespace D2G.Iris.ML.Training
         {
             try
             {
-                // Get predictions with probabilities
+
                 var predictions = model.Transform(testData);
                 var predictionData = mlContext.Data.CreateEnumerable<BinaryPredictionWithLabel>(predictions, reuseRowObject: false).ToList();
 
@@ -463,14 +463,14 @@ namespace D2G.Iris.ML.Training
                     return (new List<double>(), new List<double>(), new List<double>(), 0.0);
                 }
 
-                // Sort by probability descending
+
                 var sortedPredictions = predictionData.OrderByDescending(p => p.Probability).ToList();
 
                 var precision = new List<double>();
                 var recall = new List<double>();
                 var thresholds = new List<double>();
 
-                // Calculate total positives
+
                 int totalPositives = sortedPredictions.Count(p => p.Label);
 
                 if (totalPositives == 0)
@@ -479,10 +479,10 @@ namespace D2G.Iris.ML.Training
                     return (new List<double>(), new List<double>(), new List<double>(), 0.0);
                 }
 
-                // Add starting point at recall=0
-                // When no samples are predicted positive (threshold=1.0), precision is undefined
-                // Following sklearn convention: set precision to 1.0 at recall=0
-                // This represents perfect precision when making no predictions
+
+
+
+
                 precision.Add(1.0);
                 recall.Add(0.0);
                 thresholds.Add(1.0);
@@ -490,24 +490,24 @@ namespace D2G.Iris.ML.Training
                 int truePositives = 0;
                 int falsePositives = 0;
 
-                // Generate PR curve points
+
                 for (int i = 0; i < sortedPredictions.Count; i++)
                 {
                     var pred = sortedPredictions[i];
 
-                    // Update counters
+
                     if (pred.Label)
                         truePositives++;
                     else
                         falsePositives++;
 
-                    // Calculate precision and recall
+
                     double currentRecall = (double)truePositives / totalPositives;
                     double currentPrecision = (truePositives + falsePositives) > 0
                         ? (double)truePositives / (truePositives + falsePositives)
                         : 0.0;
 
-                    // Only add point if it's different from the last point (avoid duplicates)
+
                     if (i == sortedPredictions.Count - 1 ||
                         Math.Abs(pred.Probability - sortedPredictions[i + 1].Probability) > 1e-10)
                     {
@@ -517,13 +517,13 @@ namespace D2G.Iris.ML.Training
                     }
                 }
 
-                // Calculate Average Precision (AP) using right Riemann sum
-                // This matches the standard method used by scikit-learn
+
+
                 double ap = 0.0;
                 for (int i = 1; i < recall.Count; i++)
                 {
                     double recallDiff = recall[i] - recall[i - 1];
-                    // Use current precision (not average) for right Riemann sum
+
                     ap += recallDiff * precision[i];
                 }
 

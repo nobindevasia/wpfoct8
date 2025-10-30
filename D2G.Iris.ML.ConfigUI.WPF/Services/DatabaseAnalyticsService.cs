@@ -115,7 +115,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     var hasDataType = dataTypes.TryGetValue(columnName, out var dataType);
                     var isNumeric = hasDataType && IsNumericSqlType(dataType);
 
-                    // Skip non-numeric columns entirely for statistical analysis
+
                     if (!isNumeric)
                     {
                         statistics.Add(new ColumnStatistics
@@ -261,7 +261,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
                                 if (shouldIncludePercentiles && shouldIncludeMoments)
                                 {
-                                    // Has percentiles AND moments: 0-6 basic, 7-9 percentiles, 10-11 moments
+
                                     q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7));
                                     median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8));
                                     q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9));
@@ -270,7 +270,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                                 }
                                 else if (shouldIncludePercentiles && !shouldIncludeMoments)
                                 {
-                                    // Has percentiles only: 0-6 basic, 7-9 percentiles
+
                                     q1 = reader.IsDBNull(7) ? 0 : Convert.ToDouble(reader.GetValue(7));
                                     median = reader.IsDBNull(8) ? 0 : Convert.ToDouble(reader.GetValue(8));
                                     q3 = reader.IsDBNull(9) ? 0 : Convert.ToDouble(reader.GetValue(9));

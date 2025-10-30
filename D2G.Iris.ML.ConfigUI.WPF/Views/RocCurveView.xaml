@@ -18,7 +18,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
+
         <Border Grid.Row="0" Background="#F8F9FA" Padding="20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
             <StackPanel>
                 <TextBlock Text="ROC Curve Analysis"
@@ -32,9 +32,9 @@
             </StackPanel>
         </Border>
 
-        <!-- ROC Curve Chart -->
+
         <Grid Grid.Row="1" Margin="20">
-            <!-- Empty State -->
+
             <Border Background="#F8F9FA"
                     CornerRadius="8"
                     Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverted}">
@@ -49,12 +49,12 @@
                 </StackPanel>
             </Border>
 
-            <!-- SciChart Surface -->
+
             <ContentPresenter Content="{Binding RocCurveChart}"
                               Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}}"/>
         </Grid>
 
-        <!-- Statistics Panel -->
+
         <Border Grid.Row="2" Background="#F8F9FA" Padding="20" BorderBrush="#E9ECEF" BorderThickness="0,1,0,0"
                 Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid>
@@ -65,7 +65,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- AUC Score -->
+
                 <Border Grid.Column="0" Background="White" CornerRadius="8" Padding="16" Margin="0,0,10,0"
                         BorderBrush="#E9ECEF" BorderThickness="1">
                     <StackPanel>
@@ -81,7 +81,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Optimal Threshold -->
+
                 <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="16" Margin="0,0,10,0"
                         BorderBrush="#E9ECEF" BorderThickness="1">
                     <StackPanel>
@@ -97,7 +97,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- True Positive Rate at Optimal -->
+
                 <Border Grid.Column="2" Background="White" CornerRadius="8" Padding="16" Margin="0,0,10,0"
                         BorderBrush="#E9ECEF" BorderThickness="1">
                     <StackPanel>
@@ -113,7 +113,7 @@
                     </StackPanel>
                 </Border>
 
-                <!-- False Positive Rate at Optimal -->
+
                 <Border Grid.Column="3" Background="White" CornerRadius="8" Padding="16"
                         BorderBrush="#E9ECEF" BorderThickness="1">
                     <StackPanel>

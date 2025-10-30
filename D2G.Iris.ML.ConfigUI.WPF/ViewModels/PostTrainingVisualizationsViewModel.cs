@@ -53,22 +53,22 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _hasTrainingResults, value);
         }
 
-        /// <summary>
-        /// Determines if confusion matrix is available for current model type
-        /// </summary>
+
+
+
         public bool IsConfusionMatrixAvailable =>
             CurrentModelType == ModelType.BinaryClassification ||
             CurrentModelType == ModelType.MultiClassClassification;
 
-        /// <summary>
-        /// Determines if ROC curve is available for current model type
-        /// </summary>
+
+
+
         public bool IsRocCurveAvailable =>
             CurrentModelType == ModelType.BinaryClassification;
 
-        /// <summary>
-        /// Determines if Precision-Recall curve is available for current model type
-        /// </summary>
+
+
+
         public bool IsPrecisionRecallCurveAvailable =>
             CurrentModelType == ModelType.BinaryClassification;
 
@@ -76,11 +76,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Methods
 
-        /// <summary>
-        /// Updates the confusion matrix visualization
-        /// </summary>
-        /// <param name="confusionMatrix">2D array of confusion matrix values</param>
-        /// <param name="classLabels">List of class labels</param>
+
+
+
+
+
         public void UpdateConfusionMatrix(double[,] confusionMatrix, List<string> classLabels)
         {
             if (IsConfusionMatrixAvailable)
@@ -90,9 +90,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates the confusion matrix visualization with pre-calculated metrics
-        /// </summary>
+
+
+
         public void UpdateConfusionMatrixWithMetrics(double[,] confusionMatrix, List<string> classLabels,
             double accuracy, double precision, double recall, double f1Score)
         {
@@ -103,13 +103,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates the ROC curve visualization
-        /// </summary>
-        /// <param name="fpr">False Positive Rate values</param>
-        /// <param name="tpr">True Positive Rate values</param>
-        /// <param name="thresholds">Threshold values</param>
-        /// <param name="aucScore">AUC score</param>
+
+
+
+
+
+
+
         public void UpdateRocCurve(List<double> fpr, List<double> tpr, List<double> thresholds, double aucScore)
         {
             if (IsRocCurveAvailable)
@@ -119,13 +119,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates the Precision-Recall curve visualization
-        /// </summary>
-        /// <param name="precision">Precision values</param>
-        /// <param name="recall">Recall values</param>
-        /// <param name="thresholds">Threshold values</param>
-        /// <param name="averagePrecision">Average Precision (AP) score</param>
+
+
+
+
+
+
+
         public void UpdatePrecisionRecallCurve(List<double> precision, List<double> recall, List<double> thresholds, double averagePrecision)
         {
             if (IsPrecisionRecallCurveAvailable)
@@ -135,16 +135,16 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        /// <summary>
-        /// Updates visualization availability based on model type
-        /// </summary>
+
+
+
         private void UpdateVisualizationAvailability()
         {
             OnPropertyChanged(nameof(IsConfusionMatrixAvailable));
             OnPropertyChanged(nameof(IsRocCurveAvailable));
             OnPropertyChanged(nameof(IsPrecisionRecallCurveAvailable));
 
-            // Clear visualizations if they're not available for current model type
+
             if (!IsConfusionMatrixAvailable)
             {
                 ConfusionMatrix.Clear();
@@ -161,9 +161,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        /// <summary>
-        /// Clears all visualization data
-        /// </summary>
+
+
+
         public void ClearAll()
         {
             ConfusionMatrix.Clear();
@@ -173,9 +173,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             SelectedVisualizationIndex = 0;
         }
 
-        /// <summary>
-        /// Sets the model type (used when training starts)
-        /// </summary>
+
+
+
         public void SetModelType(ModelType modelType)
         {
             CurrentModelType = modelType;

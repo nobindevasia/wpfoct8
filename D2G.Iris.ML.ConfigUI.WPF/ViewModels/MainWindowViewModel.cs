@@ -479,7 +479,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                     TrainingLogs.LogMessage("=============== Training Complete ===============", "Success");
 
-                    // Update post-training visualizations
+
                     UpdatePostTrainingVisualizations(trainingResult, config.ModelType);
 
                     try { File.Delete(tempConfigPath); } catch { }
@@ -553,10 +553,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             if (trainingResult == null) return;
 
-            // Update model type for visualizations
+
             PostTrainingVisualizations.SetModelType(modelType);
 
-            // Extract and update confusion matrix for classification models
+
             if (modelType == ModelType.BinaryClassification && trainingResult.Metrics is BinaryClassificationMetrics binaryMetrics)
             {
                 var confusionMatrix = binaryMetrics.ConfusionMatrix;
@@ -565,7 +565,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     var matrixCounts = ConvertToMatrix(confusionMatrix.Counts);
                     var labels = new List<string> { "Negative", "Positive" };
 
-                    // Pass the actual ML.NET metrics for accurate display
+
                     PostTrainingVisualizations.UpdateConfusionMatrixWithMetrics(
                         matrixCounts,
                         labels,
@@ -576,7 +576,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
                 }
 
-                // Update ROC curve if data is available
+
                 if (trainingResult.RocCurveFpr != null && trainingResult.RocCurveTpr != null &&
                     trainingResult.RocCurveThresholds != null && trainingResult.RocCurveFpr.Count > 0)
                 {
@@ -588,7 +588,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     TrainingLogs.LogMessage($"ROC curve visualization updated (AUC: {trainingResult.AucScore:F4})", "Info");
                 }
 
-                // Update Precision-Recall curve if data is available
+
                 if (trainingResult.PrecisionRecallPrecision != null && trainingResult.PrecisionRecallRecall != null &&
                     trainingResult.PrecisionRecallThresholds != null && trainingResult.PrecisionRecallPrecision.Count > 0)
                 {
@@ -614,11 +614,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         labels.Add($"Class {i}");
                     }
 
-                    // For multiclass, calculate average F1 from per-class metrics if available
+
                     double f1Score = 0;
                     if (multiclassMetrics.PerClassLogLoss != null && multiclassMetrics.PerClassLogLoss.Count > 0)
                     {
-                        // Use macro accuracy as a proxy for F1 if not directly available
+
                         f1Score = multiclassMetrics.MacroAccuracy;
                     }
 
@@ -627,7 +627,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         labels,
                         multiclassMetrics.MicroAccuracy,
                         multiclassMetrics.MacroAccuracy,
-                        multiclassMetrics.MacroAccuracy, // Using macro as recall approximation
+                        multiclassMetrics.MacroAccuracy,
                         f1Score);
                     TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
                 }

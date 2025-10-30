@@ -82,7 +82,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
                 var html = _viewModel?.PlotHtml;
                 _pendingHtml = html;
 
-                // Update immediately on UI thread
+
                 await Dispatcher.InvokeAsync(async () =>
                 {
                     await EnsureWebViewAsync();

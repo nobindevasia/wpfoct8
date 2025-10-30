@@ -18,7 +18,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
+
         <Border Grid.Row="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Padding="20,15">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -39,22 +39,22 @@
             </Grid>
         </Border>
 
-        <!-- Content -->
+
         <Grid Grid.Row="1" Margin="20">
-            <!-- Chart and Statistics -->
+
             <Grid Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="300"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Chart Area -->
+
                 <Border Grid.Column="0" Background="White" BorderBrush="#E0E0E0" BorderThickness="1"
                         CornerRadius="6" Padding="15" Margin="0,0,10,0">
                     <ContentPresenter Content="{Binding PrecisionRecallChart}"/>
                 </Border>
 
-                <!-- Statistics Panel -->
+
                 <Border Grid.Column="1" Background="White" BorderBrush="#E0E0E0" BorderThickness="1"
                         CornerRadius="6" Padding="20">
                     <StackPanel>
@@ -64,7 +64,7 @@
                                    Foreground="#2C3E50"
                                    Margin="0,0,0,15"/>
 
-                        <!-- Average Precision -->
+
                         <Border Background="#E8F5E9" BorderBrush="#27AE60" BorderThickness="0,0,0,3"
                                 Padding="15,12" Margin="0,0,0,12" CornerRadius="4">
                             <StackPanel>
@@ -92,7 +92,7 @@
                                    Foreground="#2C3E50"
                                    Margin="0,0,0,12"/>
 
-                        <!-- Threshold Value -->
+
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -103,7 +103,7 @@
                                        FontSize="12" FontWeight="SemiBold" Foreground="#34495E"/>
                         </Grid>
 
-                        <!-- Precision at Optimal -->
+
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -114,7 +114,7 @@
                                        FontSize="12" FontWeight="SemiBold" Foreground="#34495E"/>
                         </Grid>
 
-                        <!-- Recall at Optimal -->
+
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -125,7 +125,7 @@
                                        FontSize="12" FontWeight="SemiBold" Foreground="#34495E"/>
                         </Grid>
 
-                        <!-- F1 Score at Optimal -->
+
                         <Border Background="#E3F2FD" BorderBrush="#3498DB" BorderThickness="1"
                                 Padding="12,8" Margin="0,5,0,0" CornerRadius="4">
                             <Grid>
@@ -142,7 +142,7 @@
 
                         <Separator Margin="0,20,0,15" Background="#E0E0E0"/>
 
-                        <!-- Information Box -->
+
                         <Border Background="#FFF8E1" BorderBrush="#FFC107" BorderThickness="1"
                                 Padding="12" CornerRadius="4">
                             <StackPanel>
@@ -163,7 +163,7 @@
                 </Border>
             </Grid>
 
-            <!-- Empty State -->
+
             <Border Background="White" CornerRadius="16" Padding="40,30"
                     Visibility="{Binding HasData, Converter={StaticResource InverseBooleanToVisibilityConverter}}"
                     BorderBrush="#E0E0E0" BorderThickness="2">

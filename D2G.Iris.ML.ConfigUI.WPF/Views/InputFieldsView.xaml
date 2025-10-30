@@ -45,7 +45,7 @@
             
             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
 
-                <!-- Selection Buttons -->
+
                 <Button Content="Select All" 
                         Command="{Binding SelectAllCommand}"
                         Background="LightGreen"

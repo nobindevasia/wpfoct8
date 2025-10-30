@@ -82,9 +82,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Public Methods
 
-        /// <summary>
-        /// Updates the Precision-Recall curve with precision, recall, and threshold data
-        /// </summary>
+
+
+
         public void UpdatePrecisionRecallCurve(List<double> precision, List<double> recall, List<double> thresholds, double averagePrecision)
         {
             if (precision == null || recall == null || precision.Count == 0 || recall.Count == 0 || precision.Count != recall.Count)
@@ -95,7 +95,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             AveragePrecision = averagePrecision;
 
-            // Find optimal threshold (maximum F1 score)
+
             var optimalIndex = FindOptimalThresholdIndex(precision, recall);
             if (optimalIndex >= 0 && optimalIndex < thresholds.Count)
             {
@@ -105,7 +105,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 F1AtOptimal = 2 * (PrecisionAtOptimal * RecallAtOptimal) / (PrecisionAtOptimal + RecallAtOptimal);
             }
 
-            // Create the chart on the UI thread
+
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 var chart = CreatePrecisionRecallChart(precision, recall, optimalIndex);
@@ -114,9 +114,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             });
         }
 
-        /// <summary>
-        /// Clears all Precision-Recall curve data
-        /// </summary>
+
+
+
         public void Clear()
         {
             PrecisionRecallChart = null;
@@ -132,9 +132,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Private Methods
 
-        /// <summary>
-        /// Finds the optimal threshold index using F1 score
-        /// </summary>
+
+
+
         private int FindOptimalThresholdIndex(List<double> precision, List<double> recall)
         {
             var maxF1 = double.MinValue;
@@ -144,7 +144,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 if (precision[i] + recall[i] == 0) continue;
 
-                // F1 score = 2 * (precision * recall) / (precision + recall)
+
                 var f1 = 2 * (precision[i] * recall[i]) / (precision[i] + recall[i]);
                 if (f1 > maxF1)
                 {
@@ -156,9 +156,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return optimalIndex;
         }
 
-        /// <summary>
-        /// Creates the Precision-Recall curve chart using SciChart
-        /// </summary>
+
+
+
         private UserControl CreatePrecisionRecallChart(List<double> precision, List<double> recall, int optimalIndex)
         {
             var containerControl = new UserControl();
@@ -170,7 +170,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Padding = new Thickness(0)
             };
 
-            // Create X-axis (Recall)
+
             var xAxis = new NumericAxis
             {
                 AxisTitle = "Recall (Sensitivity / True Positive Rate)",
@@ -184,7 +184,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 TitleFontWeight = FontWeights.SemiBold
             };
 
-            // Create Y-axis (Precision)
+
             var yAxis = new NumericAxis
             {
                 AxisTitle = "Precision (Positive Predictive Value)",
@@ -201,7 +201,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             sciChartSurface.XAxes.Add(xAxis);
             sciChartSurface.YAxes.Add(yAxis);
 
-            // Create Precision-Recall Curve line series
+
             var prDataSeries = new XyDataSeries<double, double> { SeriesName = $"PR Curve (AP = {AveragePrecision:F4})" };
             for (int i = 0; i < recall.Count; i++)
             {
@@ -212,15 +212,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 DataSeries = prDataSeries,
                 StrokeThickness = 3,
-                Stroke = Color.FromRgb(46, 204, 113), // #2ECC71 - Green
+                Stroke = Color.FromRgb(46, 204, 113),
                 AntiAliasing = true
             };
 
             sciChartSurface.RenderableSeries.Add(prLineSeries);
 
-            // Create baseline reference line (random classifier)
-            // For balanced dataset, baseline is at 0.5
-            // For imbalanced, it's the positive class ratio (we'll use 0.5 as approximation)
+
+
+
             var baselineDataSeries = new XyDataSeries<double, double> { SeriesName = "Baseline (Random Classifier)" };
             baselineDataSeries.Append(0, 0.5);
             baselineDataSeries.Append(1, 0.5);
@@ -229,14 +229,14 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 DataSeries = baselineDataSeries,
                 StrokeThickness = 2,
-                Stroke = Color.FromRgb(149, 165, 166), // #95A5A6 - Gray
+                Stroke = Color.FromRgb(149, 165, 166),
                 StrokeDashArray = new double[] { 5, 5 },
                 AntiAliasing = true
             };
 
             sciChartSurface.RenderableSeries.Add(baselineLineSeries);
 
-            // Add optimal point marker (maximum F1 score)
+
             if (optimalIndex >= 0 && optimalIndex < recall.Count)
             {
                 var optimalDataSeries = new XyDataSeries<double, double> { SeriesName = "Optimal Threshold (Max F1)" };
@@ -249,7 +249,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     {
                         Width = 12,
                         Height = 12,
-                        Fill = Color.FromRgb(231, 76, 60), // #E74C3C - Red
+                        Fill = Color.FromRgb(231, 76, 60),
                         Stroke = Colors.White,
                         StrokeThickness = 2
                     }
@@ -257,7 +257,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 sciChartSurface.RenderableSeries.Add(optimalPointSeries);
 
-                // Add annotation for optimal point
+
                 var annotation = new TextAnnotation
                 {
                     Text = $"Optimal Point (Max F1)\n({recall[optimalIndex]:F3}, {precision[optimalIndex]:F3})",
@@ -274,7 +274,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 sciChartSurface.Annotations.Add(annotation);
             }
 
-            // Add chart modifiers for interactivity
+
             sciChartSurface.ChartModifier = new ModifierGroup(
                 new ZoomPanModifier { ExecuteOn = ExecuteOn.MouseRightButton },
                 new MouseWheelZoomModifier(),

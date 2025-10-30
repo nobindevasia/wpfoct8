@@ -517,42 +517,142 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         private async Task<string?> CreateCleanedTableAsync(HashSet<string> selectedColumns)
         {
+            var guidPart = Guid.NewGuid().ToString("N")[..8];
+            var viewName = $"vw_CleanedData_{DateTime.Now:yyyyMMdd_HHmmss}_{guidPart}";
+
             try
             {
-                var tempTableName = $"#CleanedData_{Guid.NewGuid():N}";
-                var outlierRowIds = OutlierResults
-                    .Where(r => selectedColumns.Contains(r.ColumnName))
-                    .Select(r => r.RowIndex)
-                    .Distinct()
-                    .ToList();
-
-                if (!outlierRowIds.Any())
-                    return null;
-
-                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"AND ({_whereClause})";
-                var outlierCondition = string.Join(",", outlierRowIds);
-
-                var sql = $@"
-                    SELECT *
-                    INTO {tempTableName}
-                    FROM (
-                        SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) as __RowId
-                        FROM {_tableName}
-                        WHERE 1=1 {whereCondition}
-                    ) t
-                    WHERE __RowId NOT IN ({outlierCondition})";
-
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                using var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection);
+                // Build outlier bounds per column (similar to winsorization approach)
+                var columnBounds = new Dictionary<string, (double min, double max)>();
+
+                foreach (var column in selectedColumns)
+                {
+                    var columnOutliers = OutlierResults
+                        .Where(r => r.ColumnName == column)
+                        .ToList();
+
+                    if (!columnOutliers.Any())
+                        continue;
+
+                    var allValues = columnOutliers.Select(o => o.Value).ToList();
+                    var minOutlier = allValues.Min();
+                    var maxOutlier = allValues.Max();
+
+                    // Get non-outlier range from the data
+                    var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
+                    var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
+
+                    var boundsSql = $@"
+                        SELECT
+                            MIN(CAST([{column}] AS FLOAT)) as MinVal,
+                            MAX(CAST([{column}] AS FLOAT)) as MaxVal
+                        FROM {_tableName}
+                        WHERE {fullCondition}";
+
+                    using var boundsCommand = new Microsoft.Data.SqlClient.SqlCommand(boundsSql, connection);
+                    boundsCommand.CommandTimeout = 60;
+                    using var reader = await boundsCommand.ExecuteReaderAsync();
+
+                    if (await reader.ReadAsync())
+                    {
+                        var dataMin = reader.IsDBNull(0) ? minOutlier : Convert.ToDouble(reader[0]);
+                        var dataMax = reader.IsDBNull(1) ? maxOutlier : Convert.ToDouble(reader[1]);
+
+                        columnBounds[column] = (dataMin, dataMax);
+                    }
+                }
+
+                if (!columnBounds.Any())
+                    return null;
+
+                // Get all table columns
+                var allTableColumns = new List<string>();
+                string schemaName = "dbo";
+                string actualTableName = _tableName;
+
+                var cleanedTableName = _tableName.Replace("[", "").Replace("]", "");
+                if (cleanedTableName.Contains('.'))
+                {
+                    var parts = cleanedTableName.Split('.');
+                    if (parts.Length == 2)
+                    {
+                        schemaName = parts[0];
+                        actualTableName = parts[1];
+                    }
+                    else
+                    {
+                        actualTableName = parts[0];
+                    }
+                }
+                else
+                {
+                    actualTableName = cleanedTableName;
+                }
+
+                var schemaQuery = $@"
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_SCHEMA = '{schemaName}'
+                    AND TABLE_NAME = '{actualTableName}'
+                    ORDER BY ORDINAL_POSITION";
+
+                using (var schemaCommand = new Microsoft.Data.SqlClient.SqlCommand(schemaQuery, connection))
+                {
+                    using var schemaReader = await schemaCommand.ExecuteReaderAsync();
+                    while (await schemaReader.ReadAsync())
+                    {
+                        allTableColumns.Add(schemaReader.GetString(0));
+                    }
+                }
+
+                // Build SELECT with outlier filtering (set outliers to NULL or median)
+                var selectColumns = new List<string>();
+                foreach (var col in allTableColumns)
+                {
+                    if (columnBounds.ContainsKey(col))
+                    {
+                        var (minVal, maxVal) = columnBounds[col];
+                        var columnOutlierValues = OutlierResults
+                            .Where(r => r.ColumnName == col)
+                            .Select(r => r.Value)
+                            .Distinct()
+                            .ToList();
+
+                        selectColumns.Add($@"
+                            CASE
+                                WHEN ISNUMERIC([{col}]) = 1 AND (
+                                    {string.Join(" OR ", columnOutlierValues.Select(v => $"ABS(CAST([{col}] AS FLOAT) - {v}) < 0.0001"))}
+                                ) THEN NULL
+                                ELSE [{col}]
+                            END AS [{col}]");
+                    }
+                    else
+                    {
+                        selectColumns.Add($"[{col}]");
+                    }
+                }
+
+                var whereCondition = string.IsNullOrEmpty(_whereClause) ? "" : $"WHERE {_whereClause}";
+                var createViewSql = $@"
+                    CREATE VIEW {viewName} AS
+                    SELECT {string.Join(",\n                           ", selectColumns)}
+                    FROM {_tableName}
+                    {whereCondition}";
+
+                using var command = new Microsoft.Data.SqlClient.SqlCommand(createViewSql, connection);
+                command.CommandTimeout = 120;
                 await command.ExecuteNonQueryAsync();
 
-                return tempTableName;
+                _isViewCreated = true;
+
+                return viewName;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error creating cleaned table: {ex}");
+                Console.WriteLine($"Error creating cleaned view: {ex.Message}");
                 return null;
             }
         }

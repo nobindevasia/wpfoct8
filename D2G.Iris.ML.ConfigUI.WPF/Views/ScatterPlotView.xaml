@@ -18,7 +18,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header and Controls -->
+
         <Border Grid.Row="0" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
@@ -39,7 +39,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- X Axis Selection -->
+
                     <TextBlock Grid.Column="0" Text="X Axis:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding NumericColumns}"
@@ -47,7 +47,7 @@
                               DisplayMemberPath="."
                               Height="30"/>
 
-                    <!-- Y Axis Selection -->
+
                     <TextBlock Grid.Column="3" Text="Y Axis:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <ComboBox Grid.Column="4"
                               ItemsSource="{Binding NumericColumns}"
@@ -55,7 +55,7 @@
                               DisplayMemberPath="."
                               Height="30"/>
 
-                    <!-- Generate Button -->
+
                     <Button Grid.Column="6"
                             Content="Generate Plot"
                             Command="{Binding GeneratePlotCommand}"
@@ -96,9 +96,9 @@
             </Grid>
         </Border>
 
-        <!-- Chart Area -->
+
         <Grid Grid.Row="1" Margin="15">
-            <!-- Scatter Plot -->
+
             <s:SciChartSurface x:Name="ScatterChart">
                 <s:SciChartSurface.XAxis>
                     <s:NumericAxis DrawMajorBands="True"
@@ -132,7 +132,7 @@
                 </s:SciChartSurface.ChartModifier>
             </s:SciChartSurface>
 
-            <!-- Loading Overlay -->
+
             <Border Background="#80FFFFFF"
                     Visibility="{Binding IsGeneratingPlot, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -141,7 +141,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- Empty State -->
+
             <Border Background="#FAFAFA"
                     Visibility="{Binding ScatterPlotData, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Border.Style>
@@ -164,7 +164,7 @@
             </Border>
         </Grid>
 
-        <!-- Footer with Correlation Info -->
+
         <Border Grid.Row="2" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0" Padding="15">
             <StackPanel Orientation="Horizontal">
                 <TextBlock FontSize="14" Margin="0,0,10,0" VerticalAlignment="Center"/>

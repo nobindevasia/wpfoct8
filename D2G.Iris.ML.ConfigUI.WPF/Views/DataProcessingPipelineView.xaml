@@ -197,7 +197,7 @@
             </Grid>
             
 
-            <!-- Intermediate Results Configuration -->
+
             <Grid Grid.Row="2" Margin="8,8,8,8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -212,7 +212,7 @@
                 <Label Grid.Row="0" Content="Intermediate Results Output Configuration"
                        FontSize="13" FontWeight="Bold" Padding="0,2"/>
 
-                <!-- Database -->
+
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="170"/>
@@ -228,7 +228,7 @@
                              ToolTip="Database name (leave empty to use current database)"/>
                 </Grid>
 
-                <!-- Schema -->
+
                 <Grid Grid.Row="4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="170"/>
@@ -244,7 +244,7 @@
                              ToolTip="Schema name (e.g., dbo)"/>
                 </Grid>
 
-                <!-- Table Name -->
+
                 <Grid Grid.Row="6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="170"/>

@@ -353,7 +353,7 @@
                             <Label Content="folds (2-10)" VerticalAlignment="Center" Margin="5,0,0,0"/>
                         </StackPanel>
 
-                        <!-- Random Seed -->
+
                         <Label Grid.Row="10" Grid.Column="0" Content="Random Seed:" VerticalAlignment="Center"/>
                         <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal">
                             <TextBox Text="{Binding AutoMLSeed, UpdateSourceTrigger=PropertyChanged}"

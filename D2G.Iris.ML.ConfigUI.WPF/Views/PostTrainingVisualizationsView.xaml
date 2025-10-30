@@ -17,10 +17,10 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
+
         <Border Grid.Row="0" Background="#34495E" Padding="20,15">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="📈" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBlock FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="Post-Training Visualizations"
                                FontSize="18"
@@ -34,9 +34,9 @@
             </StackPanel>
         </Border>
 
-        <!-- Visualizations Content -->
+
         <Grid Grid.Row="1" Background="#ECF0F1">
-            <!-- No Training Results Message -->
+
             <Border Background="White"
                     CornerRadius="8"
                     Padding="60"
@@ -61,14 +61,14 @@
                             CornerRadius="6"
                             Padding="20,12">
                         <TextBlock FontSize="14" Foreground="White">
-                            <Run Text="💡 Tip: " FontWeight="Bold"/>
+                            <Run Text="Tip: " FontWeight="Bold"/>
                             <Run Text="Click 'Launch Training' to train your model and generate visualizations"/>
                         </TextBlock>
                     </Border>
                 </StackPanel>
             </Border>
 
-            <!-- Visualization Tabs -->
+
             <TabControl Grid.Row="0"
                         SelectedIndex="{Binding SelectedVisualizationIndex}"
                         Visibility="{Binding HasTrainingResults, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -120,8 +120,8 @@
                     </Style>
                 </TabControl.Resources>
 
-                <!-- Confusion Matrix Tab -->
-                <TabItem Header="🔲 Confusion Matrix"
+
+                <TabItem Header="Confusion Matrix"
                          Visibility="{Binding IsConfusionMatrixAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
@@ -131,7 +131,7 @@
                     </Border>
                 </TabItem>
 
-                <!-- ROC Curve Tab (for binary classification) -->
+
                 <TabItem Header="ROC-AUC Curve"
                          Visibility="{Binding IsRocCurveAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
@@ -142,8 +142,8 @@
                     </Border>
                 </TabItem>
 
-                <!-- Precision-Recall Curve Tab (for binary classification) -->
-                <TabItem Header="📈 Precision-Recall Curve"
+
+                <TabItem Header="Precision-Recall Curve"
                          Visibility="{Binding IsPrecisionRecallCurveAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
@@ -153,8 +153,8 @@
                     </Border>
                 </TabItem>
 
-                <!-- Residual Plot Tab (for regression) -->
-                <TabItem Header="📉 Residual Plot" IsEnabled="False" Visibility="Collapsed">
+
+                <TabItem Header="Residual Plot" IsEnabled="False" Visibility="Collapsed">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
                             BorderThickness="1,0,1,1"
@@ -169,7 +169,7 @@
                     </Border>
                 </TabItem>
 
-                <!-- Feature Importance Tab -->
+
                 <TabItem Header="Feature Importance" IsEnabled="False" Visibility="Collapsed">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"

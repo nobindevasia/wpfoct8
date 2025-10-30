@@ -16,7 +16,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
     {
         private readonly IDialogService _dialogService;
         private string _selectedAlgorithm = "fasttree";
-        private decimal _testFraction = 20m; // Stored as percentage (0-100)
+        private decimal _testFraction = 20m;
         private ModelType _currentModelType = ModelType.BinaryClassification;
         private Models.ParameterItem? _selectedParameter;
 
@@ -356,7 +356,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 SelectedAlgorithm = matchingAlgorithm ?? (AvailableAlgorithms.Count > 0 ? AvailableAlgorithms[0] : "fasttree");
             }
 
-            TestFraction = (decimal)(parameters.TestFraction * 100); // Convert fraction to percentage
+            TestFraction = (decimal)(parameters.TestFraction * 100);
 
             Parameters.Clear();
             if (parameters.AlgorithmParameters != null)
@@ -395,11 +395,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             var trainingParams = new TrainingParameters
             {
                 Algorithm = SelectedAlgorithm,
-                TestFraction = (double)TestFraction / 100.0, // Convert percentage to fraction
+                TestFraction = (double)TestFraction / 100.0,
                 AlgorithmParameters = algorithmParameters
             };
 
-            // Parse seed value - if empty or invalid, set to null for random seed
+
             uint? seedValue = null;
             if (!string.IsNullOrWhiteSpace(AutoMLSeed) && uint.TryParse(AutoMLSeed, out uint parsedSeed))
             {

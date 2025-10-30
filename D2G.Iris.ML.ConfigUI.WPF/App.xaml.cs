@@ -56,16 +56,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<DataProcessingPipelineViewModel>();
             services.AddTransient<TrainingLogsViewModel>();
 
-            // Child ViewModels for ExploratoryDataAnalysisViewModel
+
             services.AddTransient<VisualisationViewModel>();
-            services.AddTransient<OutlierDetectionViewModel>();
+            services.AddSingleton<OutlierDetectionViewModel>();  // Changed to Singleton to preserve state across training
             services.AddTransient<ScatterPlotViewModel>();
             services.AddTransient<ViolinPlotViewModel>();
             services.AddTransient<BoxPlotViewModel>();
             services.AddTransient<QQPlotViewModel>();
-            services.AddTransient<ExploratoryDataAnalysisViewModel>();
+            services.AddTransient<CorrelationHeatmapViewModel>();
+            services.AddSingleton<ExploratoryDataAnalysisViewModel>();  // Changed to Singleton to preserve state across training
 
-            // Child ViewModels for PostTrainingVisualizationsViewModel
+
             services.AddTransient<ConfusionMatrixViewModel>();
             services.AddTransient<RocCurveViewModel>();
             services.AddTransient<PrecisionRecallCurveViewModel>();

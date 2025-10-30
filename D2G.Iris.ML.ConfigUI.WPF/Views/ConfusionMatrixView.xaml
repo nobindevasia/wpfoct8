@@ -9,7 +9,7 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
-        <!-- Style for heatmap cell text -->
+
         <Style x:Key="HeatmapTextStyle" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="Bold"/>
@@ -27,7 +27,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header Section -->
+
         <Border Grid.Row="0" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="15,12">
             <Grid>
                 <Grid.RowDefinitions>
@@ -38,7 +38,7 @@
 
                 <TextBlock Grid.Row="0" Text="Confusion Matrix" FontSize="16" FontWeight="Bold" Foreground="#2C3E50"/>
 
-                <!-- Metrics Summary -->
+
                 <Grid Grid.Row="2">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -47,7 +47,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Accuracy Card -->
+
                     <Border Grid.Column="0" Background="White" CornerRadius="6" Padding="10,8" Margin="0,0,8,0"
                             BorderBrush="#E0E0E0" BorderThickness="1">
                         <StackPanel>
@@ -56,7 +56,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Precision Card -->
+
                     <Border Grid.Column="1" Background="White" CornerRadius="6" Padding="10,8" Margin="0,0,8,0"
                             BorderBrush="#E0E0E0" BorderThickness="1">
                         <StackPanel>
@@ -65,7 +65,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Recall Card -->
+
                     <Border Grid.Column="2" Background="White" CornerRadius="6" Padding="10,8" Margin="0,0,8,0"
                             BorderBrush="#E0E0E0" BorderThickness="1">
                         <StackPanel>
@@ -74,7 +74,7 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- F1 Score Card -->
+
                     <Border Grid.Column="3" Background="White" CornerRadius="6" Padding="10,8"
                             BorderBrush="#E0E0E0" BorderThickness="1">
                         <StackPanel>
@@ -86,14 +86,14 @@
             </Grid>
         </Border>
 
-        <!-- Main Content -->
+
         <Grid Grid.Row="1" Margin="15,10,15,15">
-            <!-- No Data Message -->
+
             <Border Background="White" CornerRadius="8" Padding="40"
                     Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}, ConverterParameter=Inverted}"
                     BorderBrush="#E0E0E0" BorderThickness="1">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="📊" FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                    <TextBlock FontSize="64" HorizontalAlignment="Center" Margin="0,0,0,20"/>
                     <TextBlock Text="No Confusion Matrix Data Available"
                                FontSize="18" FontWeight="SemiBold" Foreground="#7F8C8D"
                                HorizontalAlignment="Center"/>
@@ -103,7 +103,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- Confusion Matrix Heatmap -->
+
             <Border Background="White" CornerRadius="8" Padding="15"
                     Visibility="{Binding HasData, Converter={StaticResource BooleanToVisibilityConverter}}"
                     BorderBrush="#E0E0E0" BorderThickness="1">
@@ -113,7 +113,7 @@
                         <RowDefinition Height="380"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Chart Title and Legend -->
+
                     <Grid Grid.Row="0" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -130,7 +130,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <!-- Confusion Matrix Grid -->
+
                     <Grid Grid.Row="1" Margin="0,8,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -143,7 +143,7 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
-                        <!-- Column headers -->
+
                         <ItemsControl Grid.Row="0" Grid.Column="2" ItemsSource="{Binding ClassLabels}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -164,7 +164,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Row headers -->
+
                         <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ClassLabels}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -185,7 +185,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Confusion matrix cells -->
+
                         <ItemsControl Grid.Row="1" Grid.Column="2" ItemsSource="{Binding Cells}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -210,7 +210,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- Y-axis label -->
+
                         <TextBlock Grid.Row="1" Grid.Column="0"
                                    Text="Actual Class"
                                    FontSize="11"
@@ -224,7 +224,7 @@
                             </TextBlock.LayoutTransform>
                         </TextBlock>
 
-                        <!-- X-axis label -->
+
                         <TextBlock Grid.Row="2" Grid.Column="2"
                                    Text="Predicted Class"
                                    FontSize="11"

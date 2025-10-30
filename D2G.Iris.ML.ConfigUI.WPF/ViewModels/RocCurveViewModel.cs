@@ -74,9 +74,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Public Methods
 
-        /// <summary>
-        /// Updates the ROC curve with FPR, TPR, and threshold data
-        /// </summary>
+
+
+
         public void UpdateRocCurve(List<double> fpr, List<double> tpr, List<double> thresholds, double aucScore)
         {
             if (fpr == null || tpr == null || fpr.Count == 0 || tpr.Count == 0 || fpr.Count != tpr.Count)
@@ -87,7 +87,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             AucScore = aucScore;
 
-            // Find optimal threshold (closest to top-left corner)
+
             var optimalIndex = FindOptimalThresholdIndex(fpr, tpr);
             if (optimalIndex >= 0 && optimalIndex < thresholds.Count)
             {
@@ -96,7 +96,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 FprAtOptimal = fpr[optimalIndex];
             }
 
-            // Create the chart on the UI thread
+
             System.Windows.Application.Current?.Dispatcher.Invoke(() =>
             {
                 var chart = CreateRocCurveChart(fpr, tpr, optimalIndex);
@@ -105,9 +105,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             });
         }
 
-        /// <summary>
-        /// Clears all ROC curve data
-        /// </summary>
+
+
+
         public void Clear()
         {
             RocCurveChart = null;
@@ -122,9 +122,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #region Private Methods
 
-        /// <summary>
-        /// Finds the optimal threshold index using Youden's J statistic
-        /// </summary>
+
+
+
         private int FindOptimalThresholdIndex(List<double> fpr, List<double> tpr)
         {
             var maxJ = double.MinValue;
@@ -132,7 +132,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
             for (int i = 0; i < fpr.Count; i++)
             {
-                // Youden's J statistic = TPR - FPR
+
                 var j = tpr[i] - fpr[i];
                 if (j > maxJ)
                 {
@@ -144,9 +144,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return optimalIndex;
         }
 
-        /// <summary>
-        /// Creates the ROC curve chart using SciChart
-        /// </summary>
+
+
+
         private UserControl CreateRocCurveChart(List<double> fpr, List<double> tpr, int optimalIndex)
         {
             var containerControl = new UserControl();
@@ -158,7 +158,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Padding = new Thickness(0)
             };
 
-            // Create X-axis (False Positive Rate)
+
             var xAxis = new NumericAxis
             {
                 AxisTitle = "False Positive Rate (FPR)",
@@ -172,7 +172,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 TitleFontWeight = FontWeights.SemiBold
             };
 
-            // Create Y-axis (True Positive Rate)
+
             var yAxis = new NumericAxis
             {
                 AxisTitle = "True Positive Rate (TPR) / Sensitivity",
@@ -189,7 +189,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             sciChartSurface.XAxes.Add(xAxis);
             sciChartSurface.YAxes.Add(yAxis);
 
-            // Create ROC Curve line series
+
             var rocDataSeries = new XyDataSeries<double, double> { SeriesName = $"ROC Curve (AUC = {AucScore:F4})" };
             for (int i = 0; i < fpr.Count; i++)
             {
@@ -200,13 +200,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 DataSeries = rocDataSeries,
                 StrokeThickness = 3,
-                Stroke = Color.FromRgb(52, 152, 219), // #3498DB
+                Stroke = Color.FromRgb(52, 152, 219),
                 AntiAliasing = true
             };
 
             sciChartSurface.RenderableSeries.Add(rocLineSeries);
 
-            // Create diagonal reference line (random classifier)
+
             var diagonalDataSeries = new XyDataSeries<double, double> { SeriesName = "Random Classifier (AUC = 0.50)" };
             diagonalDataSeries.Append(0, 0);
             diagonalDataSeries.Append(1, 1);
@@ -215,14 +215,14 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 DataSeries = diagonalDataSeries,
                 StrokeThickness = 2,
-                Stroke = Color.FromRgb(149, 165, 166), // #95A5A6
+                Stroke = Color.FromRgb(149, 165, 166),
                 StrokeDashArray = new double[] { 5, 5 },
                 AntiAliasing = true
             };
 
             sciChartSurface.RenderableSeries.Add(diagonalLineSeries);
 
-            // Add optimal point marker
+
             if (optimalIndex >= 0 && optimalIndex < fpr.Count)
             {
                 var optimalDataSeries = new XyDataSeries<double, double> { SeriesName = "Optimal Threshold" };
@@ -235,7 +235,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     {
                         Width = 12,
                         Height = 12,
-                        Fill = Color.FromRgb(231, 76, 60), // #E74C3C
+                        Fill = Color.FromRgb(231, 76, 60),
                         Stroke = Colors.White,
                         StrokeThickness = 2
                     }
@@ -243,7 +243,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 sciChartSurface.RenderableSeries.Add(optimalPointSeries);
 
-                // Add annotation for optimal point
+
                 var annotation = new TextAnnotation
                 {
                     Text = $"Optimal Point\n({fpr[optimalIndex]:F3}, {tpr[optimalIndex]:F3})",
@@ -260,7 +260,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 sciChartSurface.Annotations.Add(annotation);
             }
 
-            // Add chart modifiers for interactivity
+
             sciChartSurface.ChartModifier = new ModifierGroup(
                 new ZoomPanModifier { ExecuteOn = ExecuteOn.MouseRightButton },
                 new MouseWheelZoomModifier(),

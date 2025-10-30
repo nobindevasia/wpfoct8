@@ -216,7 +216,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             double safeMax = Math.Max(maxVal, 1);
             System.Diagnostics.Debug.WriteLine($"Max value in matrix: {safeMax}");
 
-            // Check if we need to reverse labels for binary classification (Negative/Positive swap)
+
             var labelsCopy = classLabels.ToList();
             bool shouldReverse = rows == 2 && cols == 2 &&
                                  classLabels.Count >= 2 &&
@@ -237,7 +237,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     double normalized = safeMax > 0 ? cellValue / safeMax : 0;
                     normalized = Math.Clamp(normalized, 0d, 1d);
 
-                    // Use the reversed labels if applicable
+
                     string rowLabel = row < labelsCopy.Count ? labelsCopy[row] : $"Class {row}";
                     string columnLabel = column < labelsCopy.Count ? labelsCopy[column] : $"Class {column}";
                     string backgroundColor = GetHeatmapColor(normalized);

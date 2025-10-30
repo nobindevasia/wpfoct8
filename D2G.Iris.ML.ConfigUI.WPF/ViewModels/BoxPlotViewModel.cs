@@ -166,7 +166,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 }
 
                 ProgressMessage = "Calculating quartiles and outliers...";
-                await Task.Delay(100); // Brief delay to show progress
+                await Task.Delay(100);
 
                 ProgressMessage = "Rendering box plot...";
                 BoxPlotData = boxData;

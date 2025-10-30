@@ -70,7 +70,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 if (SetProperty(ref _multicollinearityThresholdText, value))
                 {
-                    // Try to parse and update the decimal value
+
                     if (decimal.TryParse(value, System.Globalization.NumberStyles.Any,
                         System.Globalization.CultureInfo.InvariantCulture, out decimal result))
                     {

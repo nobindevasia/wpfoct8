@@ -52,7 +52,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private ViolinPlotViewModel _violinPlotViewModel;
         private BoxPlotViewModel _boxPlotViewModel;
         private QQPlotViewModel _qqPlotViewModel;
-        private UserControl? _correlationHeatmapChart;
+        private CorrelationHeatmapViewModel _correlationHeatmapViewModel;
 
         private DatasetSummary? _currentDatasetSummary;
         private List<ColumnStatistics>? _currentColumnStatistics;
@@ -69,7 +69,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             ScatterPlotViewModel scatterPlotViewModel,
             ViolinPlotViewModel violinPlotViewModel,
             BoxPlotViewModel boxPlotViewModel,
-            QQPlotViewModel qqPlotViewModel)
+            QQPlotViewModel qqPlotViewModel,
+            CorrelationHeatmapViewModel correlationHeatmapViewModel)
         {
             _dialogService = dialogService;
             _databaseAnalytics = databaseAnalytics;
@@ -81,9 +82,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _violinPlotViewModel = violinPlotViewModel;
             _boxPlotViewModel = boxPlotViewModel;
             _qqPlotViewModel = qqPlotViewModel;
+            _correlationHeatmapViewModel = correlationHeatmapViewModel;
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
-            GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
         }
 
         #region Properties
@@ -172,18 +173,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             set => SetProperty(ref _qqPlotViewModel, value);
         }
 
-        public UserControl? CorrelationHeatmapChart
-        {
-            get => _correlationHeatmapChart;
-            set => SetProperty(ref _correlationHeatmapChart, value);
-        }
+        public CorrelationHeatmapViewModel CorrelationHeatmap => _correlationHeatmapViewModel;
 
         #endregion
 
         #region Commands
 
         public ICommand AnalyzeDataCommand { get; }
-        public ICommand GenerateCorrelationCommand { get; }
 
         #endregion
 
@@ -248,8 +244,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 if (cleanedDataInfo == null)
                     return null;
 
-                Console.WriteLine("Falling back to database approach for cleaned data");
-
                 var dataLoader = new DatabaseDataLoader();
                 var allColumns = featureColumns.Concat(new[] { targetColumn }).ToArray();
 
@@ -276,13 +270,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private bool CanAnalyzeData()
         {
             return _getDatabaseConfig != null && _getInputFields != null && !_isLoading;
-        }
-
-        private bool CanGenerateCorrelation()
-        {
-            return _currentColumnStatistics != null &&
-                   _currentColumnStatistics.Any(c => IsNumericType(c.DataType)) &&
-                   !_isLoading;
         }
 
         private async Task AnalyzeDataAsync()
@@ -368,8 +355,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 LoadingMessage = "Setting up visualization components...";
                 await Task.Delay(100);
 
-                // For Histograms, ViolinPlot and BoxPlot, exclude target variable from columns list
-                // These are univariate analysis tools and don't need the target
+
+
                 var columnsWithoutTarget = string.IsNullOrEmpty(targetField)
                     ? _enabledColumns
                     : _enabledColumns.Where(col => !string.Equals(col, targetField, StringComparison.OrdinalIgnoreCase)).ToArray();
@@ -385,10 +372,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _qqPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
+                _correlationHeatmapViewModel.SetDatabaseConnection(_connectionString, _tableName, _currentColumnStatistics, _whereClause);
 
                 _dialogService.ShowInfoDialog(
-                    $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +
-                    $"Dataset: {NumberOfRows:N0} rows � {NumberOfColumns} columns\n" +
+                    $"Analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +
+                    $"Dataset: {NumberOfRows:N0} rows {NumberOfColumns} columns\n" +
                     $"Missing values: {TotalMissingValues:N0} ({MissingValuesPercentage:F2}%)",
                     "Analysis Complete");
             }
@@ -396,57 +384,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 _dialogService.ShowErrorDialog($"Error analyzing data: {ex.Message}", "Analysis Error");
                 Console.WriteLine($"EDA Analysis error: {ex}");
-            }
-            finally
-            {
-                IsLoading = false;
-            }
-        }
-
-        private async Task GenerateCorrelationMatrixAsync()
-        {
-            try
-            {
-                IsLoading = true;
-                LoadingMessage = "Calculating correlations...";
-
-                if (_currentColumnStatistics == null || _connectionString == null || _tableName == null)
-                {
-                    _dialogService.ShowErrorDialog("No data available. Please analyze data first.", "Error");
-                    return;
-                }
-
-                var numericColumns = _currentColumnStatistics
-                    .Where(c => IsNumericType(c.DataType))
-                    .Select(c => c.ColumnName)
-                    .ToArray();
-
-                if (numericColumns.Length < 2)
-                {
-                    var errorChart = CreateErrorControl("At least 2 numeric columns are required for correlation analysis.");
-                    CorrelationHeatmapChart = errorChart;
-                    _dialogService.ShowErrorDialog("At least 2 numeric columns are required for correlation analysis.", "Insufficient Data");
-                    return;
-                }
-
-                LoadingMessage = $"Computing correlations for {numericColumns.Length} numeric columns...";
-                await Task.Delay(100);
-
-                var correlationMatrix = await _databaseAnalytics.GetCorrelationMatrixAsync(
-                    _connectionString, _tableName, numericColumns, _whereClause);
-
-                LoadingMessage = "Creating correlation heatmap...";
-                await Task.Delay(100);
-
-                var correlationChart = CreateCorrelationHeatmap(correlationMatrix);
-                CorrelationHeatmapChart = correlationChart;
-
-                _dialogService.ShowInfoDialog("Correlation matrix generated successfully using database analytics.", "Correlation Analysis");
-            }
-            catch (Exception ex)
-            {
-                _dialogService.ShowErrorDialog($"Error generating correlation matrix: {ex.Message}", "Correlation Error");
-                Console.WriteLine($"Correlation error: {ex}");
             }
             finally
             {
@@ -545,277 +482,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             return errorControl;
         }
 
-        private UserControl CreateCorrelationHeatmap(CorrelationMatrix correlationMatrix)
-        {
-            if (correlationMatrix.Columns.Count < 2)
-            {
-                return CreateErrorControl("Insufficient correlation data available.");
-            }
-
-            var columnNames = correlationMatrix.Columns;
-            var size = columnNames.Count;
-
-            var containerControl = new UserControl();
-            var mainGrid = new Grid();
-
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            mainGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            var titleBlock = new TextBlock
-            {
-                Text = "Correlation Heatmap",
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(10)
-            };
-            Grid.SetRow(titleBlock, 0);
-            mainGrid.Children.Add(titleBlock);
-
-            var correlationData = new double[size, size];
-            for (int i = 0; i < size; i++)
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    correlationData[i, j] = correlationMatrix.GetCorrelation(columnNames[i], columnNames[j]);
-                }
-            }
-
-            var sciChartSurface = new SciChartSurface
-            {
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Stretch,
-                Margin = new Thickness(5),
-                Background = Brushes.White,
-                Padding = new Thickness(10)
-            };
-
-            var heatmapDataSeries = new UniformHeatmapDataSeries<int, int, double>(correlationData, 0, 1, 0, 1);
-            var heatmapSeries = new FastUniformHeatmapRenderableSeries
-            {
-                DataSeries = heatmapDataSeries,
-                DrawTextInCell = true,
-                Opacity = 1.0
-            };
-
-            var colorMap = new HeatmapColorPalette
-            {
-                Minimum = -1.0,
-                Maximum = 1.0
-            };
-
-            colorMap.GradientStops.Add(new GradientStop(Colors.Blue, 0.0));
-            colorMap.GradientStops.Add(new GradientStop(Colors.Cyan, 0.25));
-            colorMap.GradientStops.Add(new GradientStop(Colors.White, 0.5));
-            colorMap.GradientStops.Add(new GradientStop(Colors.Yellow, 0.75));
-            colorMap.GradientStops.Add(new GradientStop(Colors.Red, 1.0));
-
-            heatmapSeries.ColorMap = colorMap;
-
-            var xAxis = new NumericAxis
-            {
-                AxisTitle = "Features",
-                VisibleRange = new DoubleRange(-0.5, size - 0.5),
-                MajorDelta = 1,
-                MinorDelta = 1,
-                DrawMinorTicks = false,
-                DrawMajorTicks = true,
-                DrawMajorGridLines = true,
-                DrawMinorGridLines = false,
-                DrawMajorBands = false,
-                AutoTicks = false,
-                LabelProvider = new FeatureNameLabelProvider(columnNames.ToArray()),
-                AxisAlignment = AxisAlignment.Bottom
-            };
-
-            var yAxis = new NumericAxis
-            {
-                AxisTitle = "Features",
-                VisibleRange = new DoubleRange(-0.5, size - 0.5),
-                MajorDelta = 1,
-                MinorDelta = 1,
-                DrawMinorTicks = false,
-                DrawMajorTicks = true,
-                DrawMajorGridLines = true,
-                DrawMinorGridLines = false,
-                DrawMajorBands = false,
-                AutoTicks = false,
-                LabelProvider = new ReversedFeatureNameLabelProvider(columnNames.ToArray()),
-                AxisAlignment = AxisAlignment.Left,
-                FlipCoordinates = true
-            };
-
-            sciChartSurface.XAxes.Add(xAxis);
-            sciChartSurface.YAxes.Add(yAxis);
-            sciChartSurface.RenderableSeries.Add(heatmapSeries);
-
-            sciChartSurface.ChartModifier = new ModifierGroup(
-                new MouseWheelZoomModifier(),
-                new RubberBandXyZoomModifier(),
-                new ZoomExtentsModifier(),
-                new ZoomPanModifier { ExecuteOn = ExecuteOn.MouseRightButton },
-                new CursorModifier { ShowTooltip = true, ShowAxisLabels = true },
-                new XAxisDragModifier(),
-                new YAxisDragModifier()
-            );
-
-            Grid.SetRow(sciChartSurface, 1);
-            mainGrid.Children.Add(sciChartSurface);
-
-            var legendPanel = CreateLegendPanel();
-            Grid.SetRow(legendPanel, 2);
-            mainGrid.Children.Add(legendPanel);
-
-            containerControl.Content = mainGrid;
-            return containerControl;
-        }
-
-        private StackPanel CreateLegendPanel()
-        {
-            var legendPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(10)
-            };
-
-            legendPanel.Children.Add(new TextBlock
-            {
-                Text = "Database-Computed Correlations: ",
-                FontWeight = FontWeights.Bold,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0)
-            });
-
-            var legendItems = new[]
-            {
-                (Colors.Blue, "-1 (Strong Negative)"),
-                (Colors.Cyan, "-0.5 (Negative)"),
-                (Colors.White, "0 (No Correlation)"),
-                (Colors.Yellow, "0.5 (Positive)"),
-                (Colors.Red, "+1 (Strong Positive)")
-            };
-
-            foreach (var (color, description) in legendItems)
-            {
-                legendPanel.Children.Add(new Rectangle
-                {
-                    Width = 20,
-                    Height = 15,
-                    Fill = new SolidColorBrush(color),
-                    Margin = new Thickness(0, 0, 5, 0)
-                });
-
-                legendPanel.Children.Add(new TextBlock
-                {
-                    Text = description,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 15, 0),
-                    FontSize = 10
-                });
-            }
-
-            return legendPanel;
-        }
-
         #endregion
 
-        #region Label Providers for SciChart
-
-        public class FeatureNameLabelProvider : LabelProviderBase
-        {
-            private readonly string[] featureNames;
-
-            public FeatureNameLabelProvider(string[] featureNames)
-            {
-                this.featureNames = featureNames;
-            }
-
-            public override string FormatLabel(IComparable dataValue)
-            {
-                try
-                {
-                    int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    int reversedIndex = featureNames.Length - 1 - index;
-                    if (reversedIndex >= 0 && reversedIndex < featureNames.Length)
-                    {
-                        string name = featureNames[reversedIndex];
-                        return name.Length > 12 ? name.Substring(0, 12) + "..." : name;
-                    }
-                    return string.Empty;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            }
-
-            public override string FormatCursorLabel(IComparable dataValue)
-            {
-                try
-                {
-                    int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    int reversedIndex = featureNames.Length - 1 - index;
-                    if (reversedIndex >= 0 && reversedIndex < featureNames.Length)
-                        return featureNames[reversedIndex];
-                    return string.Empty;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            }
-        }
-
-        public class ReversedFeatureNameLabelProvider : LabelProviderBase
-        {
-            private readonly string[] featureNames;
-
-            public ReversedFeatureNameLabelProvider(string[] featureNames)
-            {
-                this.featureNames = featureNames;
-            }
-
-            public override string FormatLabel(IComparable dataValue)
-            {
-                try
-                {
-                    int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    if (index >= 0 && index < featureNames.Length)
-                    {
-                        int reversedIndex = featureNames.Length - 1 - index;
-                        string name = featureNames[reversedIndex];
-                        return name.Length > 12 ? name.Substring(0, 12) + "..." : name;
-                    }
-                    return string.Empty;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            }
-
-            public override string FormatCursorLabel(IComparable dataValue)
-            {
-                try
-                {
-                    int index = (int)Math.Floor(Convert.ToDouble(dataValue) + 0.5);
-                    if (index >= 0 && index < featureNames.Length)
-                    {
-                        int reversedIndex = featureNames.Length - 1 - index;
-                        return featureNames[reversedIndex];
-                    }
-                    return string.Empty;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            }
-        }
-
-        #endregion
+        #region IDisposable
 
         protected override void Dispose(bool disposing)
         {
@@ -827,6 +496,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
             base.Dispose(disposing);
         }
+
+        #endregion
     }
 
     #region Supporting Classes

@@ -39,12 +39,29 @@ namespace D2G.Iris.ML.Data
             using (var conn = new SqlConnection(sqlConnectionString))
             {
                 conn.Open();
-                var countSql = $"SELECT COUNT(*) FROM {fullTableName}" +
-                               (!string.IsNullOrWhiteSpace(whereSyntax)
-                                    ? $" WHERE {whereSyntax}" : string.Empty);
-                using (var countCmd = new SqlCommand(countSql, conn))
+
+                // Skip row count for views to avoid timeout on complex queries
+                if (!tableName.StartsWith("vw_", StringComparison.OrdinalIgnoreCase))
                 {
-                    _lastLoadedRowCount = Convert.ToInt64(countCmd.ExecuteScalar());
+                    var countSql = $"SELECT COUNT(*) FROM {fullTableName}" +
+                                   (!string.IsNullOrWhiteSpace(whereSyntax)
+                                        ? $" WHERE {whereSyntax}" : string.Empty);
+                    using (var countCmd = new SqlCommand(countSql, conn))
+                    {
+                        countCmd.CommandTimeout = 120;
+                        try
+                        {
+                            _lastLoadedRowCount = Convert.ToInt64(countCmd.ExecuteScalar());
+                        }
+                        catch
+                        {
+                            _lastLoadedRowCount = null;
+                        }
+                    }
+                }
+                else
+                {
+                    _lastLoadedRowCount = null;
                 }
             }
 

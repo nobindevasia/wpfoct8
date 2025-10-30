@@ -56,12 +56,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
                     var boxPlotDataSeries = new BoxPlotDataSeries<double, double>();
 
                     boxPlotDataSeries.Append(
-                        0,                      // X position
-                        boxData.Median,         // Median
-                        boxData.LowerWhisker,   // Lower Whisker (Q1 - 1.5*IQR, but not below Min)
-                        boxData.Q1,             // Lower Quartile
-                        boxData.Q3,             // Upper Quartile
-                        boxData.UpperWhisker    // Upper Whisker (Q3 + 1.5*IQR, but not above Max)
+                        0,
+                        boxData.Median,
+                        boxData.LowerWhisker,
+                        boxData.Q1,
+                        boxData.Q3,
+                        boxData.UpperWhisker
                     );
 
                     

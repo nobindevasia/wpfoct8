@@ -20,7 +20,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header and Controls -->
+
         <Border Grid.Row="0" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,0,0,1" Padding="15">
             <Grid>
                 <Grid.RowDefinitions>
@@ -38,7 +38,7 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Column Selection -->
+
                     <TextBlock Grid.Column="0" Text="Select Column:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <ComboBox Grid.Column="1"
                               ItemsSource="{Binding NumericColumns}"
@@ -46,7 +46,7 @@
                               DisplayMemberPath="."
                               Height="30"/>
 
-                    <!-- Generate Button -->
+
                     <Button Grid.Column="3"
                             Content="Generate Violin Plot"
                             Command="{Binding GeneratePlotCommand}"
@@ -87,16 +87,16 @@
             </Grid>
         </Border>
 
-        <!-- Chart Area -->
+
         <Grid Grid.Row="1" Margin="15">
-            <!-- Violin Plot rendered with WebView2 -->
+
             <wv2:WebView2 x:Name="PlotWebView"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
                           DefaultBackgroundColor="White"
                           Visibility="{Binding IsGeneratingPlot, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
 
-            <!-- Loading Overlay - Shows when generating plot -->
+
             <Grid Visibility="{Binding IsGeneratingPlot, Converter={StaticResource BooleanToVisibilityConverter}}"
                   Background="#F5F5F5">
                 <Border Background="White"
@@ -120,53 +120,53 @@
                 </Border>
             </Grid>
 
-            <!-- Empty State - Temporarily commented out for debugging -->
-            <!--<Border Background="#FAFAFA">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding PlotHtml}" Value="{x:Null}"/>
-                                    <Condition Binding="{Binding IsGeneratingPlot}" Value="False"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter Property="Visibility" Value="Visible"/>
-                            </MultiDataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Border.Style>
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock FontSize="16" FontWeight="Bold" Foreground="#FF6B6B"
-                               HorizontalAlignment="Center" Margin="0,0,0,15"
-                               Text="⚠ No Data Available"/>
-                    <TextBlock Text="Please click 'Analyze Data' on the Data Summary tab first"
-                               FontSize="14"
-                               Foreground="#888888"
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"
-                               Margin="20,0,20,10"/>
-                    <TextBlock Text="Then select a numeric column and click Generate Violin Plot"
-                               FontSize="13"
-                               Foreground="#999999"
-                               HorizontalAlignment="Center"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"
-                               Margin="20,0"/>
-                    <TextBlock Text="Violin plots show the distribution shape and statistical summary of your data"
-                               FontSize="11"
-                               Foreground="#AAAAAA"
-                               HorizontalAlignment="Center"
-                               FontStyle="Italic"
-                               TextWrapping="Wrap"
-                               TextAlignment="Center"
-                               Margin="20,15,20,0"/>
-                </StackPanel>
-            </Border>-->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         </Grid>
 
-        <!-- Footer with Statistics Info -->
+
         <Border Grid.Row="2" Background="#F5F5F5" BorderBrush="#DDDDDD" BorderThickness="0,1,0,0" Padding="15">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Statistics: " FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,10,0"/>

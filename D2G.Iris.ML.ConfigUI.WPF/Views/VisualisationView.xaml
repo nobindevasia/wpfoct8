@@ -42,7 +42,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <!-- Header with column info -->
+
                     <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10,10,10,5">
                         <TextBlock Text="{Binding ColumnName}" FontWeight="Bold" FontSize="14"/>
                         <TextBlock Text=" (" Margin="5,0,0,0"/>
@@ -54,7 +54,7 @@
                         
                     </StackPanel>
                     
-                    <!-- Chart area -->
+
                     <Grid Grid.Row="1">
                         <s:SciChartSurface Height="200" Margin="10">
                             <s:SciChartSurface.XAxis>
@@ -83,7 +83,7 @@
                             </s:SciChartSurface.ChartModifier>
                         </s:SciChartSurface>
                         
-                        <!-- Loading overlay for individual histograms -->
+
                         <Border Background="#80FFFFFF" 
                                Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}">
                             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -94,7 +94,7 @@
                     </Grid>
                     
                     
-                    <!-- Action text -->
+
                     <TextBlock Grid.Row="2" Text="Click to view detailed analysis" 
                                HorizontalAlignment="Center" Margin="5"
                                FontSize="11" FontStyle="Italic" Foreground="Gray"/>
@@ -104,7 +104,7 @@
     </UserControl.Resources>
 
     <Grid>
-        <!-- Progress Overlay -->
+
         <Border Background="#80000000" Visibility="{Binding IsGeneratingHistograms, Converter={StaticResource BooleanToVisibilityConverter}}" 
                 Panel.ZIndex="1000">
             <Border Background="White" CornerRadius="8" Padding="30" 
@@ -123,14 +123,14 @@
             </Border>
         </Border>
 
-        <!-- Overview Grid -->
+
         <Grid Visibility="{Binding IsDetailViewVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
-            <!-- Generate Histograms Button -->
+
             <Border Grid.Row="0" Background="#FFF8F8F8" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="15">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Content="Generate Histograms" 
@@ -144,7 +144,7 @@
                 </StackPanel>
             </Border>
             
-            <!-- Histograms Display -->
+
             <Grid Grid.Row="1">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ItemsControl ItemsSource="{Binding Histograms}" 
@@ -166,14 +166,14 @@
             </Grid>
         </Grid>
 
-        <!-- Detail View -->
+
         <Grid Visibility="{Binding IsDetailViewVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
-            <!-- Header with Back Button -->
+
             <Border Grid.Row="0" Background="#FFF8F8F8" BorderBrush="LightGray" BorderThickness="0,0,0,1" Padding="15">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -197,7 +197,7 @@
                 </Grid>
             </Border>
             
-            <!-- Detail Content -->
+
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                 <Grid Margin="20">
                     <Grid.RowDefinitions>
@@ -205,7 +205,7 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     
-                    <!-- Large Chart -->
+
                     <Border Grid.Row="0" BorderBrush="LightGray" BorderThickness="1" Background="White" CornerRadius="8" Margin="0,0,0,20">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -245,7 +245,7 @@
                         </Grid>
                     </Border>
                     
-                    <!-- Statistics Panel -->
+
                     <Border Grid.Row="1" BorderBrush="LightGray" BorderThickness="1" Background="White" CornerRadius="8">
                         <StackPanel Margin="20">
                             <TextBlock Text="Statistical Summary" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,15"/>
@@ -257,7 +257,7 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 
-                                <!-- Basic Statistics -->
+
                                 <StackPanel Grid.Column="0" Margin="0,0,20,0">
                                     <TextBlock Text="Basic Statistics" FontWeight="SemiBold" Margin="0,0,0,10"/>
                                     <StackPanel>
@@ -269,7 +269,7 @@
                                     </StackPanel>
                                 </StackPanel>
                                 
-                                <!-- Range Statistics -->
+
                                 <StackPanel Grid.Column="1" Margin="0,0,20,0">
                                     <TextBlock Text="Range &amp; Quartiles" FontWeight="SemiBold" Margin="0,0,0,10"/>
                                     <StackPanel>
@@ -281,7 +281,7 @@
                                     </StackPanel>
                                 </StackPanel>
                                 
-                                <!-- Distribution Statistics -->
+
                                 <StackPanel Grid.Column="2">
                                     <TextBlock Text="Distribution &amp; Quality" FontWeight="SemiBold" Margin="0,0,0,10"/>
                                     <StackPanel>

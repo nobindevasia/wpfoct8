@@ -37,7 +37,7 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Configuration Panel -->
+
         <GroupBox Grid.Row="0" Header="Outlier Detection Configuration" Margin="10">
             <Grid Margin="10">
                 <Grid.RowDefinitions>
@@ -55,12 +55,12 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Method Selection -->
+
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Method:" VerticalAlignment="Center" FontWeight="Bold"/>
                 <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding OutlierDetectionMethods}" 
                           SelectedItem="{Binding SelectedMethod}" Margin="5,2"/>
 
-                <!-- Z-Score Threshold (only for ZScore method) -->
+
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Z-Score Threshold:" VerticalAlignment="Center" FontWeight="Bold"
                            Visibility="{Binding SelectedMethod, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter=ZScore}"/>
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="5,2"
@@ -70,7 +70,7 @@
                     <TextBlock Text="(default: 3.0)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray"/>
                 </StackPanel>
 
-                <!-- IQR Multiplier (only for IQR method) -->
+
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="IQR Multiplier:" VerticalAlignment="Center" FontWeight="Bold"
                            Visibility="{Binding SelectedMethod, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter=IQR}"/>
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="5,2"
@@ -80,7 +80,7 @@
                     <TextBlock Text="(default: 1.5)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray"/>
                 </StackPanel>
 
-                <!-- Modified Z-Score Threshold (only for ModifiedZScore method) -->
+
                 <TextBlock Grid.Row="1" Grid.Column="0" Text="Modified Z Threshold:" VerticalAlignment="Center" FontWeight="Bold"
                            Visibility="{Binding SelectedMethod, Converter={StaticResource EnumToVisibilityConverter}, ConverterParameter=ModifiedZScore}"/>
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="5,2"
@@ -90,7 +90,7 @@
                     <TextBlock Text="(default: 3.5)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray"/>
                 </StackPanel>
 
-                <!-- Winsorization Parameters (for treatment) - Only show when there are results -->
+
                 <TextBlock Grid.Row="2" Grid.Column="0" Text="Winsorization:" VerticalAlignment="Center" FontWeight="Bold"
                            Visibility="{Binding SummaryResults.Count, Converter={StaticResource CountToVisibilityConverter}}"/>
                 <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="5,2"
@@ -105,31 +105,31 @@
                     <TextBlock Text="%" VerticalAlignment="Center" Margin="2,0,0,0" Foreground="Gray"/>
                 </StackPanel>
 
-                <!-- Detect Button -->
+
                 <Button Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Content="Analyze All Columns" 
                         Command="{Binding DetectOutliersCommand}" Width="140" Height="30" 
                         HorizontalAlignment="Left" Margin="0,10,0,5"/>
 
-                <!-- Apply Winsorization Button -->
+
                 <Button Grid.Row="3" Grid.Column="2" Content="Apply Winsorization" 
                         Command="{Binding ApplyWinsorizationCommand}" Width="120" Height="30" 
                         HorizontalAlignment="Right" Margin="0,10,0,5"
                         Background="#FF2E8B57" Foreground="White"
                         ToolTip="Apply winsorization treatment: caps extreme values at the specified percentiles (independent of detection method)."/>
 
-                <!-- Remove Outliers Button -->
+
                 <Button Grid.Row="3" Grid.Column="3" Content="Remove Outliers" 
                         Command="{Binding RemoveOutliersCommand}" Width="120" Height="30" 
                         HorizontalAlignment="Left" Margin="15,10,0,5"
                         Background="#FFB22222" Foreground="White"
                         ToolTip="Remove all detected outlier rows from the dataset. This will permanently modify the data used for training."/>
 
-                <!-- Loading Message -->
+
                 <TextBlock Grid.Row="3" Grid.Column="4" Text="{Binding AnalysisMessage}" 
                            Visibility="{Binding IsAnalyzing, Converter={StaticResource BooleanToVisibilityConverter}}"
                            FontStyle="Italic" Foreground="Blue" Margin="10,15,0,0" VerticalAlignment="Center"/>
 
-                <!-- Status Message -->
+
                 <TextBlock Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="5" 
                            Text="✓ Outliers have been removed from the dataset. The cleaned data will be used for training."
                            Visibility="{Binding RemoveOutliersEnabled, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -139,10 +139,10 @@
             </Grid>
         </GroupBox>
         
-        <!-- Results Panel -->
+
         <GroupBox Grid.Row="1" Header="Outlier Detection Results" Margin="10,0,10,10">
             <TabControl>
-                <!-- Summary Tab -->
+
                 <TabItem Header="Summary by Column">
                     <Grid>
                         <Grid.RowDefinitions>
@@ -150,7 +150,7 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         
-                        <!-- Selection Controls -->
+
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" 
                                    Visibility="{Binding SummaryResults.Count, Converter={StaticResource CountToVisibilityConverter}}">
                             <Button Content="Select All" Command="{Binding SelectAllColumnsCommand}" 
@@ -162,7 +162,7 @@
                                       FontStyle="Italic" Foreground="Gray"/>
                         </StackPanel>
                         
-                        <!-- Summary DataGrid -->
+
                         <DataGrid Grid.Row="1" ItemsSource="{Binding SummaryResults}" 
                                   AutoGenerateColumns="False" 
                                   GridLinesVisibility="Horizontal"
@@ -221,7 +221,7 @@
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <!-- No Results Message -->
+
                         <TextBlock Grid.Row="1" Text="No analysis results. Click 'Analyze All Columns' to start." 
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
@@ -231,10 +231,10 @@
                     </Grid>
                 </TabItem>
 
-                <!-- Detailed Results Tab -->
+
                 <TabItem Header="Detailed Outliers">
                     <Grid>
-                        <!-- Results DataGrid -->
+
                         <DataGrid ItemsSource="{Binding OutlierResults}" 
                                   AutoGenerateColumns="False" 
                                   IsReadOnly="True"
@@ -263,7 +263,7 @@
                             </DataGrid.Columns>
                         </DataGrid>
 
-                        <!-- No Results Message -->
+
                         <TextBlock Text="No outliers detected. Run analysis to see detailed results." 
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
@@ -275,7 +275,7 @@
             </TabControl>
         </GroupBox>
 
-        <!-- Loading Overlay -->
+
         <Grid Grid.Row="0" Grid.RowSpan="2" Background="#80000000" 
               Visibility="{Binding IsAnalyzing, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -288,7 +288,7 @@
             </StackPanel>
         </Grid>
 
-        <!-- Enhanced Winsorization Progress Overlay -->
+
         <Grid Grid.Row="0" Grid.RowSpan="2" Background="#80000000"
               Visibility="{Binding IsApplyingWinsorization, Converter={StaticResource BooleanToVisibilityConverter}}">
             <Border Background="White"
@@ -299,7 +299,7 @@
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center">
                 <StackPanel VerticalAlignment="Center">
-                    <!-- Title -->
+
                     <TextBlock Text="Applying Winsorization"
                                HorizontalAlignment="Center"
                                FontSize="16"
@@ -307,7 +307,7 @@
                                Foreground="#333"
                                Margin="0,0,0,20"/>
 
-                    <!-- Progress Bar with Percentage -->
+
                     <Grid Margin="0,0,0,15">
                         <ProgressBar Value="{Binding WinsorizationProgressPercentage}"
                                      Minimum="0"
@@ -321,7 +321,7 @@
                                    Foreground="White"/>
                     </Grid>
 
-                    <!-- Current Step Description -->
+
                     <TextBlock Text="{Binding CurrentStepDescription}"
                                HorizontalAlignment="Center"
                                FontSize="12"
@@ -331,7 +331,7 @@
                                TextWrapping="Wrap"
                                TextAlignment="Center"/>
 
-                    <!-- Current Column Being Processed -->
+
                     <TextBlock HorizontalAlignment="Center"
                                FontSize="11"
                                Foreground="#888"
@@ -349,7 +349,7 @@
                         </TextBlock.Style>
                     </TextBlock>
 
-                    <!-- Current Column Name (highlighted) -->
+
                     <TextBlock Text="{Binding CurrentColumnBeingProcessed, StringFormat='Column: {0}'}"
                                HorizontalAlignment="Center"
                                FontSize="12"

@@ -18,10 +18,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
         {
             if (sender is TextBox textBox)
             {
-                // Get what the text would be after this input
+
                 string newText = textBox.Text.Insert(textBox.SelectionStart, e.Text);
 
-                // Allow if it matches decimal pattern
+
                 e.Handled = !DecimalRegex.IsMatch(newText);
             }
         }

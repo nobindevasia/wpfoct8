@@ -17,7 +17,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private string _optimizingMetric = "Accuracy";
         private bool _useCrossValidation = false;
         private int _numberOfFolds = 5;
-        private string? _seed = string.Empty;  // Empty string means no seed (random)
+        private string? _seed = string.Empty;
         private string _description = "AutoML is disabled. Traditional training will be used with the algorithm specified in Training Parameters.";
 
         public AutoMLSettingsViewModel()
@@ -115,7 +115,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public AutoMLConfig GetConfiguration()
         {
-            // Parse seed value - if empty or invalid, set to null for random seed
+
             uint? seedValue = null;
             if (!string.IsNullOrWhiteSpace(Seed) && uint.TryParse(Seed, out uint parsedSeed))
             {

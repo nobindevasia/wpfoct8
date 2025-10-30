@@ -51,6 +51,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private ScatterPlotViewModel _scatterPlotViewModel;
         private ViolinPlotViewModel _violinPlotViewModel;
         private BoxPlotViewModel _boxPlotViewModel;
+        private QQPlotViewModel _qqPlotViewModel;
         private UserControl? _correlationHeatmapChart;
 
         private DatasetSummary? _currentDatasetSummary;
@@ -67,7 +68,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             OutlierDetectionViewModel outlierDetectionViewModel,
             ScatterPlotViewModel scatterPlotViewModel,
             ViolinPlotViewModel violinPlotViewModel,
-            BoxPlotViewModel boxPlotViewModel)
+            BoxPlotViewModel boxPlotViewModel,
+            QQPlotViewModel qqPlotViewModel)
         {
             _dialogService = dialogService;
             _databaseAnalytics = databaseAnalytics;
@@ -78,6 +80,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _scatterPlotViewModel = scatterPlotViewModel;
             _violinPlotViewModel = violinPlotViewModel;
             _boxPlotViewModel = boxPlotViewModel;
+            _qqPlotViewModel = qqPlotViewModel;
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
             GenerateCorrelationCommand = new AsyncRelayCommand(async _ => await GenerateCorrelationMatrixAsync(), _ => CanGenerateCorrelation());
@@ -161,6 +164,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         {
             get => _boxPlotViewModel;
             set => SetProperty(ref _boxPlotViewModel, value);
+        }
+
+        public QQPlotViewModel QQPlotViewModel
+        {
+            get => _qqPlotViewModel;
+            set => SetProperty(ref _qqPlotViewModel, value);
         }
 
         public UserControl? CorrelationHeatmapChart
@@ -375,6 +384,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
                 _violinPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
+                _qqPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
 
                 _dialogService.ShowInfoDialog(
                     $"Database-side analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +

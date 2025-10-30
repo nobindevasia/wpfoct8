@@ -273,6 +273,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 new LegendModifier
                 {
                     ShowLegend = true,
+                    ShowVisibilityCheckboxes = false,
                     Orientation = Orientation.Horizontal,
                     Margin = new Thickness(10),
                     GetLegendDataFor = SourceMode.AllSeries

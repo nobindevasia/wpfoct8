@@ -20,43 +20,16 @@
 
         <!-- Header Section -->
         <Border Grid.Row="0" Background="#F8F9FA" Padding="20" BorderBrush="#E9ECEF" BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0">
-                    <TextBlock Text="ROC Curve Analysis"
-                               FontSize="18"
-                               FontWeight="Bold"
-                               Foreground="#2C3E50"/>
-                    <TextBlock Text="Receiver Operating Characteristic curve showing classifier performance"
-                               FontSize="12"
-                               Foreground="#7F8C8D"
-                               Margin="0,4,0,0"/>
-                </StackPanel>
-
-                <Border Grid.Column="1"
-                        Background="#27AE60"
-                        CornerRadius="8"
-                        Padding="16,8"
-                        VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="AUC Score: "
-                                   FontSize="13"
-                                   FontWeight="SemiBold"
-                                   Foreground="White"
-                                   VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding AucScore, StringFormat={}{0:F4}}"
-                                   FontSize="16"
-                                   FontWeight="Bold"
-                                   Foreground="White"
-                                   VerticalAlignment="Center"
-                                   Margin="4,0,0,0"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+            <StackPanel>
+                <TextBlock Text="ROC Curve Analysis"
+                           FontSize="18"
+                           FontWeight="Bold"
+                           Foreground="#2C3E50"/>
+                <TextBlock Text="Receiver Operating Characteristic curve showing classifier performance"
+                           FontSize="12"
+                           Foreground="#7F8C8D"
+                           Margin="0,4,0,0"/>
+            </StackPanel>
         </Border>
 
         <!-- ROC Curve Chart -->

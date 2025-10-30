@@ -18,6 +18,9 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
 
         public DatabaseAnalyticsService(string connectionString)
         {
+            if (string.IsNullOrEmpty(connectionString))
+                throw new ArgumentNullException(nameof(connectionString), "Connection string cannot be null or empty.");
+
             _connectionString = connectionString;
         }
 
@@ -369,12 +372,18 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     {
                         while (await reader.ReadAsync())
                         {
+                            var binStart = reader.IsDBNull(1) ? 0 : Convert.ToDouble(reader.GetValue(1));
+                            var binEnd = reader.IsDBNull(2) ? 0 : Convert.ToDouble(reader.GetValue(2));
+                            var frequency = reader.GetInt32(3);
+
                             histogram.Add(new HistogramBin
                             {
                                 BinIndex = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0)),
-                                BinStart = reader.IsDBNull(1) ? 0 : Convert.ToDouble(reader.GetValue(1)),
-                                BinEnd = reader.IsDBNull(2) ? 0 : Convert.ToDouble(reader.GetValue(2)),
-                                Frequency = reader.GetInt32(3)
+                                BinStart = binStart,
+                                BinEnd = binEnd,
+                                BinCenter = (binStart + binEnd) / 2.0,
+                                Frequency = frequency,
+                                Count = frequency
                             });
                         }
                     }
@@ -928,12 +937,18 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     {
                         while (await reader.ReadAsync())
                         {
+                            var binStart = reader.IsDBNull(1) ? 0 : Convert.ToDouble(reader.GetValue(1));
+                            var binEnd = reader.IsDBNull(2) ? 0 : Convert.ToDouble(reader.GetValue(2));
+                            var frequency = reader.GetInt32(3);
+
                             histogram.Add(new HistogramBin
                             {
                                 BinIndex = reader.IsDBNull(0) ? 0 : Convert.ToInt32(reader.GetValue(0)),
-                                BinStart = reader.IsDBNull(1) ? 0 : Convert.ToDouble(reader.GetValue(1)),
-                                BinEnd = reader.IsDBNull(2) ? 0 : Convert.ToDouble(reader.GetValue(2)),
-                                Frequency = reader.GetInt32(3)
+                                BinStart = binStart,
+                                BinEnd = binEnd,
+                                BinCenter = (binStart + binEnd) / 2.0,
+                                Frequency = frequency,
+                                Count = frequency
                             });
                         }
                     }
@@ -1146,7 +1161,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                     }
                 }
 
-                // Fetch outliers (values beyond whiskers) - limited to 500 for performance
                 if (boxPlotData != null)
                 {
                     var outlierWhereClause = string.IsNullOrWhiteSpace(whereClause)
@@ -1202,7 +1216,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 case "smallmoney":
                 case "bit":
                     return true;
-                // Exclude date/time and GUID types - they cannot be cast to FLOAT
                 case "date":
                 case "datetime":
                 case "datetime2":
@@ -1257,10 +1270,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
         public int BinIndex { get; set; }
         public double BinStart { get; set; }
         public double BinEnd { get; set; }
-        public double BinCenter => (BinStart + BinEnd) / 2.0;
+        public double BinCenter { get; set; }
         public int Frequency { get; set; }
-        public long Count => Frequency;
-        public string CategoryName { get; set; }
+        public int Count { get; set; }
+        public string CategoryName { get; set; } = string.Empty;
     }
 
     public class CategoryFrequency
@@ -1372,6 +1385,62 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
     {
         public double Value { get; set; }
         public int RowIndex { get; set; }
+    }
+
+    public class StatisticalSummary
+    {
+        public double Mean { get; set; }
+        public double Median { get; set; }
+        public double StandardDeviation { get; set; }
+        public double Variance { get; set; }
+        public double Min { get; set; }
+        public double Max { get; set; }
+        public double Range { get; set; }
+        public double Q1 { get; set; }
+        public double Q3 { get; set; }
+        public double IQR { get; set; }
+        public int MissingValues { get; set; }
+    }
+
+    public class PreviewInfo
+    {
+        public int SampleSize { get; set; }
+        public int NonNullCount { get; set; }
+        public int MissingCount { get; set; }
+        public double MissingPercentage => SampleSize > 0 ? (double)MissingCount / SampleSize * 100 : 0;
+        public double DataQuality => SampleSize > 0 ? (double)NonNullCount / SampleSize * 100 : 0;
+    }
+
+    public class OutlierSummaryResult : System.ComponentModel.INotifyPropertyChanged
+    {
+        private bool _isSelectedForRemoval;
+
+        public string ColumnName { get; set; } = string.Empty;
+        public int TotalValues { get; set; }
+        public int OutlierCount { get; set; }
+        public double OutlierPercentage { get; set; }
+        public string Method { get; set; } = string.Empty;
+        public int LowSeverityCount { get; set; }
+        public int MediumSeverityCount { get; set; }
+        public int HighSeverityCount { get; set; }
+        public int ExtremeSeverityCount { get; set; }
+        public double MaxScore { get; set; }
+        public string Status { get; set; } = string.Empty;
+
+        public bool IsSelectedForRemoval
+        {
+            get => _isSelectedForRemoval;
+            set
+            {
+                if (_isSelectedForRemoval != value)
+                {
+                    _isSelectedForRemoval = value;
+                    PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelectedForRemoval)));
+                }
+            }
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
     }
 
     #endregion

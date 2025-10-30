@@ -265,6 +265,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             try
             {
                 _configService.SaveConfiguration(_currentConfig!, _currentFilePath);
+
+                string appConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modelconfig.json");
+                if (_currentFilePath != appConfigPath)
+                {
+                    _configService.SaveConfiguration(_currentConfig!, appConfigPath);
+                }
+
                 UpdateFormTitle();
                 TrainingLogs.LogMessage($"Configuration saved to: {_currentFilePath}", "Success");
                 _dialogService.ShowInfoDialog("Configuration saved successfully.", "Success");
@@ -312,6 +319,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 else
                 {
                     _configService.SaveConfiguration(_currentConfig, _currentFilePath);
+
+                    string appConfigPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "modelconfig.json");
+                    if (_currentFilePath != appConfigPath)
+                    {
+                        _configService.SaveConfiguration(_currentConfig, appConfigPath);
+                    }
                 }
 
                 if (!_dialogService.ShowConfirmationDialog(confirmationMessage, "Confirm Training"))

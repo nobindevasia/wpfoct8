@@ -62,6 +62,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<ScatterPlotViewModel>();
             services.AddTransient<ViolinPlotViewModel>();
             services.AddTransient<BoxPlotViewModel>();
+            services.AddTransient<QQPlotViewModel>();
             services.AddTransient<ExploratoryDataAnalysisViewModel>();
 
             // Child ViewModels for PostTrainingVisualizationsViewModel

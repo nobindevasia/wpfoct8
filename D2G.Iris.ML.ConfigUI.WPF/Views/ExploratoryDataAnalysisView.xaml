@@ -284,6 +284,10 @@
                 <views:BoxPlotView DataContext="{Binding BoxPlotViewModel}"/>
             </TabItem>
 
+            <TabItem Header="Q-Q Plot">
+                <views:QQPlotView DataContext="{Binding QQPlotViewModel}"/>
+            </TabItem>
+
             <TabItem Header="Correlation Heatmap">
                 <Grid>
                     <Grid.RowDefinitions>

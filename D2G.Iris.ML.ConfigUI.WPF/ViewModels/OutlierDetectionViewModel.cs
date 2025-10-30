@@ -2,19 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Data;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using D2G.Iris.ML.ConfigUI.WPF.Commands;
 using D2G.Iris.ML.ConfigUI.WPF.Services;
-using Microsoft.Data.SqlClient;
 using OutlierDetectionMethod = D2G.Iris.ML.ConfigUI.WPF.Services.OutlierDetectionMethod;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
-    public class OutlierDetectionViewModel : INotifyPropertyChanged, IDisposable
+    public class OutlierDetectionViewModel : BaseViewModel
     {
         private readonly IDialogService _dialogService;
         private readonly IDatabaseAnalyticsService _databaseAnalytics;
@@ -1008,25 +1006,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
 
         #endregion
 
-        #region INotifyPropertyChanged
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
-
-        #endregion
-
         private async Task<long> EstimateDataSizeAsync()
         {
             try
@@ -1207,8 +1186,6 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
                 CurrentStepDescription = "Finalizing winsorization process";
                 WinsorizationProgress = "View created successfully - finalizing";
 
-                Console.WriteLine($"View {viewName} created successfully - no storage overhead!");
-
                 await Task.Delay(500);
                 WinsorizationProgressPercentage = 100;
                 CurrentStepDescription = "Winsorization completed successfully";
@@ -1222,10 +1199,13 @@ WHERE [{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1");
             }
         }
 
-
-        public void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            CleanupDatabaseObjects();
+            if (disposing)
+            {
+                CleanupDatabaseObjects();
+            }
+            base.Dispose(disposing);
         }
 
         public void CleanupView()

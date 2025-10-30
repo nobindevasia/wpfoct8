@@ -93,73 +93,32 @@
             <wv2:WebView2 x:Name="PlotWebView"
                           HorizontalAlignment="Stretch"
                           VerticalAlignment="Stretch"
-                          DefaultBackgroundColor="White"/>
+                          DefaultBackgroundColor="White"
+                          Visibility="{Binding IsGeneratingPlot, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
 
-            <!-- Loading Overlay - Always on top with Panel.ZIndex -->
-            <Border Background="#F5F5F5"
-                    Panel.ZIndex="1000"
-                    Visibility="{Binding IsGeneratingPlot, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                        <Ellipse x:Name="Dot1" Width="12" Height="12" Fill="#007ACC" Margin="0,0,8,0">
-                            <Ellipse.Resources>
-                                <Storyboard x:Key="BounceStoryboard1" RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                   From="0" To="-20" Duration="0:0:0.6"
-                                                   AutoReverse="True" BeginTime="0:0:0"/>
-                                </Storyboard>
-                            </Ellipse.Resources>
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform/>
-                            </Ellipse.RenderTransform>
-                            <Ellipse.Triggers>
-                                <EventTrigger RoutedEvent="Loaded">
-                                    <BeginStoryboard Storyboard="{StaticResource BounceStoryboard1}"/>
-                                </EventTrigger>
-                            </Ellipse.Triggers>
-                        </Ellipse>
-
-                        <Ellipse x:Name="Dot2" Width="12" Height="12" Fill="#007ACC" Margin="0,0,8,0">
-                            <Ellipse.Resources>
-                                <Storyboard x:Key="BounceStoryboard2" RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                   From="0" To="-20" Duration="0:0:0.6"
-                                                   AutoReverse="True" BeginTime="0:0:0.2"/>
-                                </Storyboard>
-                            </Ellipse.Resources>
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform/>
-                            </Ellipse.RenderTransform>
-                            <Ellipse.Triggers>
-                                <EventTrigger RoutedEvent="Loaded">
-                                    <BeginStoryboard Storyboard="{StaticResource BounceStoryboard2}"/>
-                                </EventTrigger>
-                            </Ellipse.Triggers>
-                        </Ellipse>
-
-                        <Ellipse x:Name="Dot3" Width="12" Height="12" Fill="#007ACC">
-                            <Ellipse.Resources>
-                                <Storyboard x:Key="BounceStoryboard3" RepeatBehavior="Forever">
-                                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)"
-                                                   From="0" To="-20" Duration="0:0:0.6"
-                                                   AutoReverse="True" BeginTime="0:0:0.4"/>
-                                </Storyboard>
-                            </Ellipse.Resources>
-                            <Ellipse.RenderTransform>
-                                <TranslateTransform/>
-                            </Ellipse.RenderTransform>
-                            <Ellipse.Triggers>
-                                <EventTrigger RoutedEvent="Loaded">
-                                    <BeginStoryboard Storyboard="{StaticResource BounceStoryboard3}"/>
-                                </EventTrigger>
-                            </Ellipse.Triggers>
-                        </Ellipse>
+            <!-- Loading Overlay - Shows when generating plot -->
+            <Grid Visibility="{Binding IsGeneratingPlot, Converter={StaticResource BooleanToVisibilityConverter}}"
+                  Background="#F5F5F5">
+                <Border Background="White"
+                        BorderBrush="#DDDDDD"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="30"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    <StackPanel>
+                        <TextBlock Text="Generating Violin Plot..." FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <ProgressBar IsIndeterminate="True" Height="20" Margin="0,15,0,0" Width="200"/>
+                        <TextBlock Text="{Binding ProgressMessage}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   MaxWidth="250"
+                                   TextAlignment="Center"
+                                   Foreground="#333"/>
                     </StackPanel>
-
-                    <TextBlock Text="{Binding ProgressMessage}" FontSize="14" FontWeight="Medium"
-                               HorizontalAlignment="Center" TextAlignment="Center" Foreground="#333"/>
-                </StackPanel>
-            </Border>
+                </Border>
+            </Grid>
 
             <!-- Empty State - Temporarily commented out for debugging -->
             <!--<Border Background="#FAFAFA">

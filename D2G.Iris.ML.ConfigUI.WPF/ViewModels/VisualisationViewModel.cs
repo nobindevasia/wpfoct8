@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
@@ -13,7 +11,7 @@ using D2G.Iris.ML.ConfigUI.WPF.Commands;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
-    public class VisualisationViewModel : INotifyPropertyChanged, IDisposable
+    public class VisualisationViewModel : BaseViewModel
     {
         private readonly IDialogService _dialogService;
         private readonly IDatabaseAnalyticsService _databaseAnalytics;
@@ -558,34 +556,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #endregion
 
-        #region IDisposable
-
-        public void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            _cancellationTokenSource?.Cancel();
-            _cancellationTokenSource?.Dispose();
+            if (disposing)
+            {
+                _cancellationTokenSource?.Cancel();
+                _cancellationTokenSource?.Dispose();
+            }
+            base.Dispose(disposing);
         }
-
-        #endregion
-
-        #region INotifyPropertyChanged
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        protected virtual void OnPropertyChanged([CallerMemberName] string? propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
-        {
-            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-            field = value;
-            OnPropertyChanged(propertyName);
-            return true;
-        }
-
-        #endregion
     }
 
 }

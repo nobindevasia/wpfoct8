@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -15,7 +13,7 @@ using Plotly.NET.LayoutObjects;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels;
 
-public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
+public class ViolinPlotViewModel : BaseViewModel
 {
     private readonly IDialogService _dialogService;
     private readonly IDatabaseAnalyticsService _databaseAnalyticsService;
@@ -384,35 +382,6 @@ public class ViolinPlotViewModel : INotifyPropertyChanged, IDisposable
         {
             await Application.Current.Dispatcher.InvokeAsync(() => _dialogService.ShowErrorDialog(message, "Error"));
         }
-    }
-
-    #endregion
-
-    #region INotifyPropertyChanged
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(storage, value))
-        {
-            return false;
-        }
-
-        storage = value;
-        OnPropertyChanged(propertyName);
-        return true;
-    }
-
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-
-    #endregion
-
-    #region IDisposable
-
-    public void Dispose()
-    {
     }
 
     #endregion

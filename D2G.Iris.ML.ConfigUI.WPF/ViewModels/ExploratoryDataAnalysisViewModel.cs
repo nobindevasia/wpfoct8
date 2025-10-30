@@ -31,7 +31,7 @@ using SciChart.Charting.Model.DataSeries.Heatmap2DArrayDataSeries;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 {
-    public class ExploratoryDataAnalysisViewModel : BaseViewModel, IDisposable
+    public class ExploratoryDataAnalysisViewModel : BaseViewModel
     {
         private readonly IDialogService _dialogService;
         private readonly IDatabaseAnalyticsService _databaseAnalytics;
@@ -817,12 +817,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         #endregion
 
-        public new void Dispose()
+        protected override void Dispose(bool disposing)
         {
-            _visualisationViewModel?.Dispose();
-            _outlierDetectionViewModel?.Dispose();
-            _violinPlotViewModel?.Dispose();
-            base.Dispose();
+            if (disposing)
+            {
+                _visualisationViewModel?.Dispose();
+                _outlierDetectionViewModel?.Dispose();
+                _violinPlotViewModel?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 

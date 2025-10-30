@@ -429,7 +429,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 return frequencies;
             }
         }
-
         public async Task<List<ColumnNullInfo>> GetNullAnalysisAsync(string tableName, List<string> columns)
         {
             using (var connection = new SqlConnection(_connectionString))

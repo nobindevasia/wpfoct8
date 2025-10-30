@@ -448,13 +448,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     }
                     else
                     {
-                        TrainingLogs.LogMessage("No EDA analysis performed - loading data directly from database", "Info");
                         rawData = LoadDataFromDatabase(config, enabledFields, mlContext);
                     }
 
                     var dataRowCount = rawData.GetRowCount();
                     var rowCountText = dataRowCount.HasValue ? $"{dataRowCount:N0}" : "streaming (count from database loader)";
-                    TrainingLogs.LogMessage($"Final training dataset: {rowCountText} rows, {enabledFields.Length} features", "Info");
                     TrainingLogs.LogMessage($"Target field: {config.TargetField}", "Info");
                     TrainingLogs.LogMessage($"Model type: {config.ModelType}", "Info");
 

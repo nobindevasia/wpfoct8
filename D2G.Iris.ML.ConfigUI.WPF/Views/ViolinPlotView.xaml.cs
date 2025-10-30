@@ -23,6 +23,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
             IsVisibleChanged += OnIsVisibleChanged;
         }
 
+
+
         private async void OnLoaded(object sender, RoutedEventArgs e)
         {
             await EnsureWebViewAsync();
@@ -35,7 +37,6 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Views
                 await UpdatePlotHtmlAsync(_viewModel?.PlotHtml);
             }
         }
-
         private void OnUnloaded(object sender, RoutedEventArgs e)
         {
             if (_viewModel != null)

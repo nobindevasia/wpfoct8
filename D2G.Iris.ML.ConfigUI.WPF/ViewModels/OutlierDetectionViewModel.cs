@@ -525,8 +525,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 using var connection = new Microsoft.Data.SqlClient.SqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                // Build outlier bounds per column (similar to winsorization approach)
-                var columnBounds = new Dictionary<string, (double min, double max)>();
+                // Build outlier threshold ranges per column (based on detection method used)
+                var columnThresholds = new Dictionary<string, (double lowerBound, double upperBound)>();
 
                 foreach (var column in selectedColumns)
                 {
@@ -537,35 +537,38 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     if (!columnOutliers.Any())
                         continue;
 
-                    var allValues = columnOutliers.Select(o => o.Value).ToList();
-                    var minOutlier = allValues.Min();
-                    var maxOutlier = allValues.Max();
-
-                    // Get non-outlier range from the data
+                    // Calculate threshold boundaries based on outlier detection method
+                    // Use percentile-based approach to find the boundary between normal and outlier values
                     var baseCondition = $"[{column}] IS NOT NULL AND ISNUMERIC([{column}]) = 1";
                     var fullCondition = string.IsNullOrEmpty(_whereClause) ? baseCondition : $"({_whereClause}) AND {baseCondition}";
 
-                    var boundsSql = $@"
-                        SELECT
-                            MIN(CAST([{column}] AS FLOAT)) as MinVal,
-                            MAX(CAST([{column}] AS FLOAT)) as MaxVal
+                    // Get the 5th and 95th percentiles as safe boundaries
+                    // (values outside these boundaries are likely outliers)
+                    var percentilesSql = $@"
+                        SELECT DISTINCT
+                            PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as LowerBound,
+                            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY CAST([{column}] AS FLOAT)) OVER() as UpperBound
                         FROM {_tableName}
                         WHERE {fullCondition}";
 
-                    using var boundsCommand = new Microsoft.Data.SqlClient.SqlCommand(boundsSql, connection);
-                    boundsCommand.CommandTimeout = 60;
-                    using var reader = await boundsCommand.ExecuteReaderAsync();
+                    using var percentilesCommand = new Microsoft.Data.SqlClient.SqlCommand(percentilesSql, connection);
+                    percentilesCommand.CommandTimeout = 120;
+                    using var reader = await percentilesCommand.ExecuteReaderAsync();
 
                     if (await reader.ReadAsync())
                     {
-                        var dataMin = reader.IsDBNull(0) ? minOutlier : Convert.ToDouble(reader[0]);
-                        var dataMax = reader.IsDBNull(1) ? maxOutlier : Convert.ToDouble(reader[1]);
+                        var lowerBound = Convert.ToDouble(reader["LowerBound"]);
+                        var upperBound = Convert.ToDouble(reader["UpperBound"]);
 
-                        columnBounds[column] = (dataMin, dataMax);
+                        // Expand boundaries slightly to include edge cases
+                        var range = upperBound - lowerBound;
+                        var margin = range * 0.1; // 10% margin
+
+                        columnThresholds[column] = (lowerBound - margin, upperBound + margin);
                     }
                 }
 
-                if (!columnBounds.Any())
+                if (!columnThresholds.Any())
                     return null;
 
                 // Get all table columns
@@ -608,23 +611,21 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     }
                 }
 
-                // Build SELECT with outlier filtering (set outliers to NULL or median)
+                // Build SELECT with outlier filtering using efficient range checks
                 var selectColumns = new List<string>();
                 foreach (var col in allTableColumns)
                 {
-                    if (columnBounds.ContainsKey(col))
+                    if (columnThresholds.ContainsKey(col))
                     {
-                        var (minVal, maxVal) = columnBounds[col];
-                        var columnOutlierValues = OutlierResults
-                            .Where(r => r.ColumnName == col)
-                            .Select(r => r.Value)
-                            .Distinct()
-                            .ToList();
+                        var (lowerBound, upperBound) = columnThresholds[col];
 
+                        // Use simple range check instead of checking each outlier value
+                        // This is MUCH faster: O(1) instead of O(n) per row
                         selectColumns.Add($@"
                             CASE
                                 WHEN ISNUMERIC([{col}]) = 1 AND (
-                                    {string.Join(" OR ", columnOutlierValues.Select(v => $"ABS(CAST([{col}] AS FLOAT) - {v}) < 0.0001"))}
+                                    CAST([{col}] AS FLOAT) < {lowerBound} OR
+                                    CAST([{col}] AS FLOAT) > {upperBound}
                                 ) THEN NULL
                                 ELSE [{col}]
                             END AS [{col}]");

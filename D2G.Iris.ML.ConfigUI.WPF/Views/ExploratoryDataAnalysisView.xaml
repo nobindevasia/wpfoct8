@@ -369,6 +369,10 @@
                     </StackPanel>
                 </Grid>
             </TabItem>
+
+            <TabItem Header="Pair Plot">
+                <views:PairPlotView DataContext="{Binding PairPlotViewModel}"/>
+            </TabItem>
         </TabControl>
     </Grid>
 </UserControl>

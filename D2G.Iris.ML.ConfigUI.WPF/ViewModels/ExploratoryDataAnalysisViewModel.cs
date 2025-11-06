@@ -53,6 +53,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private BoxPlotViewModel _boxPlotViewModel;
         private QQPlotViewModel _qqPlotViewModel;
         private CorrelationHeatmapViewModel _correlationHeatmapViewModel;
+        private PairPlotViewModel _pairPlotViewModel;
 
         private DatasetSummary? _currentDatasetSummary;
         private List<ColumnStatistics>? _currentColumnStatistics;
@@ -70,7 +71,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             ViolinPlotViewModel violinPlotViewModel,
             BoxPlotViewModel boxPlotViewModel,
             QQPlotViewModel qqPlotViewModel,
-            CorrelationHeatmapViewModel correlationHeatmapViewModel)
+            CorrelationHeatmapViewModel correlationHeatmapViewModel,
+            PairPlotViewModel pairPlotViewModel)
         {
             _dialogService = dialogService;
             _databaseAnalytics = databaseAnalytics;
@@ -83,6 +85,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _boxPlotViewModel = boxPlotViewModel;
             _qqPlotViewModel = qqPlotViewModel;
             _correlationHeatmapViewModel = correlationHeatmapViewModel;
+            _pairPlotViewModel = pairPlotViewModel;
 
             AnalyzeDataCommand = new AsyncRelayCommand(async _ => await AnalyzeDataAsync(), _ => CanAnalyzeData());
         }
@@ -174,6 +177,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         }
 
         public CorrelationHeatmapViewModel CorrelationHeatmap => _correlationHeatmapViewModel;
+
+        public PairPlotViewModel PairPlotViewModel
+        {
+            get => _pairPlotViewModel;
+            set => SetProperty(ref _pairPlotViewModel, value);
+        }
 
         #endregion
 
@@ -373,6 +382,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 _boxPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _qqPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
                 _correlationHeatmapViewModel.SetDatabaseConnection(_connectionString, _tableName, _currentColumnStatistics, _whereClause);
+                _pairPlotViewModel.SetDatabaseConnection(_connectionString, _tableName, columnsWithoutTarget, _whereClause);
 
                 _dialogService.ShowInfoDialog(
                     $"Analysis completed successfully for {enabledFields.Count} enabled fields.\n\n" +

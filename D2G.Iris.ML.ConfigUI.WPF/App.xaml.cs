@@ -64,6 +64,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<BoxPlotViewModel>();
             services.AddTransient<QQPlotViewModel>();
             services.AddTransient<CorrelationHeatmapViewModel>();
+            services.AddTransient<PairPlotViewModel>();
             services.AddSingleton<ExploratoryDataAnalysisViewModel>();  // Changed to Singleton to preserve state across training
 
 

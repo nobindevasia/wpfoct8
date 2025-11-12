@@ -167,6 +167,10 @@ namespace D2G.Iris.ML.Training
                 Console.WriteLine("\nCalculating Precision-Recall curve...");
                 var prData = CalculatePrecisionRecallCurve(mlContext, bestRun.Model, preparedData);
 
+                // Calculate Feature Importance
+                var (importanceFeatureNames, importanceScores) = CalculateBinaryFeatureImportance(
+                    mlContext, bestRun.Model, preparedData, featureNames);
+
                 return new TrainingResult
                 {
                     Model = bestRun.Model,
@@ -179,7 +183,9 @@ namespace D2G.Iris.ML.Training
                     PrecisionRecallPrecision = prData.precision,
                     PrecisionRecallRecall = prData.recall,
                     PrecisionRecallThresholds = prData.thresholds,
-                    AveragePrecision = prData.averagePrecision
+                    AveragePrecision = prData.averagePrecision,
+                    FeatureNames = importanceFeatureNames,
+                    FeatureImportanceScores = importanceScores
                 };
             }
             catch (Exception ex)
@@ -326,6 +332,10 @@ namespace D2G.Iris.ML.Training
             Console.WriteLine("\nCalculating Precision-Recall curve...");
             var prData = CalculatePrecisionRecallCurve(mlContext, model, split.TestSet);
 
+            // Calculate Feature Importance
+            var (importanceFeatureNames, importanceScores) = CalculateBinaryFeatureImportance(
+                mlContext, model, split.TestSet, featureNames);
+
             return new TrainingResult
             {
                 Model = model,
@@ -338,7 +348,9 @@ namespace D2G.Iris.ML.Training
                 PrecisionRecallPrecision = prData.precision,
                 PrecisionRecallRecall = prData.recall,
                 PrecisionRecallThresholds = prData.thresholds,
-                AveragePrecision = prData.averagePrecision
+                AveragePrecision = prData.averagePrecision,
+                FeatureNames = importanceFeatureNames,
+                FeatureImportanceScores = importanceScores
             };
         }
         private class BinaryVector

@@ -597,6 +597,16 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         trainingResult.AveragePrecision);
                     TrainingLogs.LogMessage($"Precision-Recall curve visualization updated (AP: {trainingResult.AveragePrecision:F4})", "Info");
                 }
+
+                // Update Feature Importance
+                if (trainingResult.FeatureNames != null && trainingResult.FeatureImportanceScores != null &&
+                    trainingResult.FeatureNames.Count > 0 && trainingResult.FeatureImportanceScores.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdateFeatureImportance(
+                        trainingResult.FeatureNames,
+                        trainingResult.FeatureImportanceScores);
+                    TrainingLogs.LogMessage($"Feature importance visualization updated ({trainingResult.FeatureNames.Count} features)", "Info");
+                }
             }
             else if (modelType == ModelType.MultiClassClassification && trainingResult.Metrics is MulticlassClassificationMetrics multiclassMetrics)
             {
@@ -628,6 +638,41 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         multiclassMetrics.MacroAccuracy,
                         f1Score);
                     TrainingLogs.LogMessage("Confusion matrix visualization updated", "Info");
+                }
+
+                // Update Feature Importance for multiclass
+                if (trainingResult.FeatureNames != null && trainingResult.FeatureImportanceScores != null &&
+                    trainingResult.FeatureNames.Count > 0 && trainingResult.FeatureImportanceScores.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdateFeatureImportance(
+                        trainingResult.FeatureNames,
+                        trainingResult.FeatureImportanceScores);
+                    TrainingLogs.LogMessage($"Feature importance visualization updated ({trainingResult.FeatureNames.Count} features)", "Info");
+                }
+            }
+            else if (modelType == ModelType.Regression && trainingResult.Metrics is RegressionMetrics regressionMetrics)
+            {
+                // Update Feature Importance for regression
+                if (trainingResult.FeatureNames != null && trainingResult.FeatureImportanceScores != null &&
+                    trainingResult.FeatureNames.Count > 0 && trainingResult.FeatureImportanceScores.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdateFeatureImportance(
+                        trainingResult.FeatureNames,
+                        trainingResult.FeatureImportanceScores);
+                    TrainingLogs.LogMessage($"Feature importance visualization updated ({trainingResult.FeatureNames.Count} features)", "Info");
+                }
+
+                // Update Residual Plots for regression
+                if (trainingResult.ActualValues != null && trainingResult.PredictedValues != null &&
+                    trainingResult.Residuals != null &&
+                    trainingResult.ActualValues.Count > 0 && trainingResult.PredictedValues.Count > 0 &&
+                    trainingResult.Residuals.Count > 0)
+                {
+                    PostTrainingVisualizations.UpdateResidualPlots(
+                        trainingResult.ActualValues,
+                        trainingResult.PredictedValues,
+                        trainingResult.Residuals);
+                    TrainingLogs.LogMessage($"Residual plot visualization updated ({trainingResult.ActualValues.Count} data points)", "Info");
                 }
             }
         }

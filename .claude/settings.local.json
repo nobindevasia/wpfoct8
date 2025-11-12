@@ -58,7 +58,8 @@
       "mcp__ide__getDiagnostics",
       "WebFetch(domain:www.scichart.com)",
       "WebSearch",
-      "Bash(Select-Object -First 5)"
+      "Bash(Select-Object -First 5)",
+      "Bash(Select-String \"error|warning|succeeded|failed\" -Context 0,1)"
     ],
     "deny": [],
     "ask": []

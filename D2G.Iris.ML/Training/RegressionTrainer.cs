@@ -28,6 +28,11 @@ namespace D2G.Iris.ML.Training
             public float Label { get; set; }
         }
 
+        private class RegressionPrediction
+        {
+            public float Score { get; set; }
+        }
+
         public override async Task<TrainingResult> TrainModel(
             MLContext mlContext,
             IDataView dataView,
@@ -146,11 +151,48 @@ namespace D2G.Iris.ML.Training
                 mlContext.Model.Save(bestRun.Model, preparedData.Schema, modelPath);
                 Console.WriteLine($"\nModel saved to: {modelPath}");
 
+                // Calculate feature importance
+                var (importanceFeatureNames, importanceScores) = CalculateRegressionFeatureImportance(
+                    mlContext, bestRun.Model, preparedData, featureNames);
+
+                // Extract predictions and residuals
+                var predictions = bestRun.Model.Transform(preparedData);
+                var predictedResults = mlContext.Data.CreateEnumerable<RegressionPrediction>(predictions, reuseRowObject: false).ToList();
+
+                var actualValues = new List<double>();
+                var predictedValues = new List<double>();
+                var residuals = new List<double>();
+
+                using (var cursor = preparedData.GetRowCursor(new[] { preparedData.Schema["Label"] }))
+                {
+                    var labelGetter = cursor.GetGetter<float>(preparedData.Schema["Label"]);
+                    int index = 0;
+
+                    while (cursor.MoveNext() && index < predictedResults.Count)
+                    {
+                        float actualLabel = 0;
+                        labelGetter(ref actualLabel);
+                        float predictedLabel = predictedResults[index].Score;
+
+                        actualValues.Add(actualLabel);
+                        predictedValues.Add(predictedLabel);
+                        residuals.Add(actualLabel - predictedLabel);
+                        index++;
+                    }
+                }
+
+                Console.WriteLine($"Extracted {actualValues.Count} predictions for residual analysis");
+
                 return new TrainingResult
                 {
                     Model = bestRun.Model,
                     Metrics = bestRun.ValidationMetrics,
-                    AlgorithmUsed = bestTrainerName
+                    AlgorithmUsed = bestTrainerName,
+                    FeatureNames = importanceFeatureNames,
+                    FeatureImportanceScores = importanceScores,
+                    ActualValues = actualValues,
+                    PredictedValues = predictedValues,
+                    Residuals = residuals
                 };
             }
             catch (Exception ex)
@@ -308,11 +350,48 @@ namespace D2G.Iris.ML.Training
                 config,
                 processedData);
 
+            // Calculate feature importance
+            var (importanceFeatureNames, importanceScores) = CalculateRegressionFeatureImportance(
+                mlContext, model, split.TestSet, featureNames);
+
+            // Extract predictions and residuals from test set
+            var predictions = model.Transform(split.TestSet);
+            var predictedResults = mlContext.Data.CreateEnumerable<RegressionPrediction>(predictions, reuseRowObject: false).ToList();
+
+            var actualValues = new List<double>();
+            var predictedValues = new List<double>();
+            var residuals = new List<double>();
+
+            using (var cursor = split.TestSet.GetRowCursor(new[] { split.TestSet.Schema["Label"] }))
+            {
+                var labelGetter = cursor.GetGetter<float>(split.TestSet.Schema["Label"]);
+                int index = 0;
+
+                while (cursor.MoveNext() && index < predictedResults.Count)
+                {
+                    float actualLabel = 0;
+                    labelGetter(ref actualLabel);
+                    float predictedLabel = predictedResults[index].Score;
+
+                    actualValues.Add(actualLabel);
+                    predictedValues.Add(predictedLabel);
+                    residuals.Add(actualLabel - predictedLabel);
+                    index++;
+                }
+            }
+
+            Console.WriteLine($"Extracted {actualValues.Count} predictions for residual analysis");
+
             return new TrainingResult
             {
                 Model = model,
                 Metrics = metrics,
-                AlgorithmUsed = config.TrainingParameters.Algorithm
+                AlgorithmUsed = config.TrainingParameters.Algorithm,
+                FeatureNames = importanceFeatureNames,
+                FeatureImportanceScores = importanceScores,
+                ActualValues = actualValues,
+                PredictedValues = predictedValues,
+                Residuals = residuals
             };
         }
 

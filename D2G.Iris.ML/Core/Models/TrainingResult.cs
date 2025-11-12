@@ -21,5 +21,14 @@ namespace D2G.Iris.ML.Core.Models
         public List<double> PrecisionRecallRecall { get; set; }
         public List<double> PrecisionRecallThresholds { get; set; }
         public double AveragePrecision { get; set; }
+
+
+        public List<string> FeatureNames { get; set; }
+        public List<double> FeatureImportanceScores { get; set; }
+
+        // Regression-specific data for residual plots
+        public List<double> ActualValues { get; set; }
+        public List<double> PredictedValues { get; set; }
+        public List<double> Residuals { get; set; }
     }
 }

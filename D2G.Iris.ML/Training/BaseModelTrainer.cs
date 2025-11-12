@@ -223,6 +223,131 @@ namespace D2G.Iris.ML.Training
             Console.WriteLine($"  Mean Squared Error:         {metrics.MeanSquaredError:F4}");
             Console.WriteLine($"  Root Mean Squared Error:    {metrics.RootMeanSquaredError:F4}");
         }
+
+        /// <summary>
+        /// Calculates Permutation Feature Importance for binary classification
+        /// </summary>
+        protected (List<string>, List<double>) CalculateBinaryFeatureImportance(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView testData,
+            string[] featureNames)
+        {
+            try
+            {
+                Console.WriteLine("\nCalculating Permutation Feature Importance...");
+
+                // Use PermutationFeatureImportanceNonCalibrated for binary classification
+                var permutationMetrics = mlContext.BinaryClassification
+                    .PermutationFeatureImportanceNonCalibrated(model, testData, labelColumnName: "Label",
+                        useFeatureWeightFilter: false, numberOfExamplesToUse: null, permutationCount: 3);
+
+                // Extract AUC importance scores
+                var importanceScores = permutationMetrics
+                    .Select(x => x.Value.AreaUnderRocCurve.Mean)
+                    .ToList();
+
+                Console.WriteLine("Feature Importance (Top 5):");
+                var sortedFeatures = featureNames
+                    .Zip(importanceScores, (name, score) => new { Name = name, Score = score })
+                    .OrderByDescending(x => x.Score)
+                    .Take(5);
+
+                foreach (var feature in sortedFeatures)
+                {
+                    Console.WriteLine($"  {feature.Name}: {feature.Score:F4}");
+                }
+
+                return (featureNames.ToList(), importanceScores);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not calculate feature importance: {ex.Message}");
+                return (new List<string>(), new List<double>());
+            }
+        }
+
+        /// <summary>
+        /// Calculates Permutation Feature Importance for multiclass classification
+        /// </summary>
+        protected (List<string>, List<double>) CalculateMulticlassFeatureImportance(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView testData,
+            string[] featureNames)
+        {
+            try
+            {
+                Console.WriteLine("\nCalculating Permutation Feature Importance...");
+
+                var permutationMetrics = mlContext.MulticlassClassification
+                    .PermutationFeatureImportance(model, testData, labelColumnName: "Label", useFeatureWeightFilter: false, numberOfExamplesToUse: null, permutationCount: 3);
+
+                // Extract MicroAccuracy importance scores
+                var importanceScores = permutationMetrics
+                    .Select(x => x.Value.MicroAccuracy.Mean)
+                    .ToList();
+
+                Console.WriteLine("Feature Importance (Top 5):");
+                var sortedFeatures = featureNames
+                    .Zip(importanceScores, (name, score) => new { Name = name, Score = score })
+                    .OrderByDescending(x => x.Score)
+                    .Take(5);
+
+                foreach (var feature in sortedFeatures)
+                {
+                    Console.WriteLine($"  {feature.Name}: {feature.Score:F4}");
+                }
+
+                return (featureNames.ToList(), importanceScores);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not calculate feature importance: {ex.Message}");
+                return (new List<string>(), new List<double>());
+            }
+        }
+
+        /// <summary>
+        /// Calculates Permutation Feature Importance for regression
+        /// </summary>
+        protected (List<string>, List<double>) CalculateRegressionFeatureImportance(
+            MLContext mlContext,
+            ITransformer model,
+            IDataView testData,
+            string[] featureNames)
+        {
+            try
+            {
+                Console.WriteLine("\nCalculating Permutation Feature Importance...");
+
+                var permutationMetrics = mlContext.Regression
+                    .PermutationFeatureImportance(model, testData, labelColumnName: "Label", useFeatureWeightFilter: false, numberOfExamplesToUse: null, permutationCount: 3);
+
+                // Extract R-Squared importance scores
+                var importanceScores = permutationMetrics
+                    .Select(x => x.Value.RSquared.Mean)
+                    .ToList();
+
+                Console.WriteLine("Feature Importance (Top 5):");
+                var sortedFeatures = featureNames
+                    .Zip(importanceScores, (name, score) => new { Name = name, Score = score })
+                    .OrderByDescending(x => x.Score)
+                    .Take(5);
+
+                foreach (var feature in sortedFeatures)
+                {
+                    Console.WriteLine($"  {feature.Name}: {feature.Score:F4}");
+                }
+
+                return (featureNames.ToList(), importanceScores);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not calculate feature importance: {ex.Message}");
+                return (new List<string>(), new List<double>());
+            }
+        }
     }
 
     public class DataSplit

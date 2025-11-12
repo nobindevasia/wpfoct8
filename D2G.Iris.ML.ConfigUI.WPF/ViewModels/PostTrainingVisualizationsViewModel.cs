@@ -13,11 +13,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public PostTrainingVisualizationsViewModel(
             ConfusionMatrixViewModel confusionMatrixViewModel,
             RocCurveViewModel rocCurveViewModel,
-            PrecisionRecallCurveViewModel precisionRecallCurveViewModel)
+            PrecisionRecallCurveViewModel precisionRecallCurveViewModel,
+            FeatureImportanceViewModel featureImportanceViewModel,
+            ResidualPlotViewModel residualPlotViewModel)
         {
             ConfusionMatrix = confusionMatrixViewModel;
             RocCurve = rocCurveViewModel;
             PrecisionRecallCurve = precisionRecallCurveViewModel;
+            FeatureImportance = featureImportanceViewModel;
+            ResidualPlot = residualPlotViewModel;
             _currentModelType = ModelType.BinaryClassification;
         }
 
@@ -28,6 +32,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public RocCurveViewModel RocCurve { get; }
 
         public PrecisionRecallCurveViewModel PrecisionRecallCurve { get; }
+
+        public FeatureImportanceViewModel FeatureImportance { get; }
+
+        public ResidualPlotViewModel ResidualPlot { get; }
 
         public int SelectedVisualizationIndex
         {
@@ -71,6 +79,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
 
         public bool IsPrecisionRecallCurveAvailable =>
             CurrentModelType == ModelType.BinaryClassification;
+
+        /// <summary>
+        /// Feature importance is available for all model types
+        /// </summary>
+        public bool IsFeatureImportanceAvailable => true;
+
+        /// <summary>
+        /// Residual plot is only available for regression
+        /// </summary>
+        public bool IsResidualPlotAvailable =>
+            CurrentModelType == ModelType.Regression;
 
         #endregion
 
@@ -135,6 +154,32 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
+        /// <summary>
+        /// Updates the feature importance visualization
+        /// </summary>
+        public void UpdateFeatureImportance(List<string> featureNames, List<double> importanceScores)
+        {
+            if (IsFeatureImportanceAvailable && featureNames != null && importanceScores != null &&
+                featureNames.Count > 0 && importanceScores.Count > 0)
+            {
+                FeatureImportance.UpdateFeatureImportance(featureNames, importanceScores);
+                HasTrainingResults = true;
+            }
+        }
+
+        /// <summary>
+        /// Updates the residual plot visualization
+        /// </summary>
+        public void UpdateResidualPlots(List<double> actualValues, List<double> predictedValues, List<double> residuals)
+        {
+            if (IsResidualPlotAvailable && actualValues != null && predictedValues != null && residuals != null &&
+                actualValues.Count > 0 && predictedValues.Count > 0 && residuals.Count > 0)
+            {
+                ResidualPlot.UpdateResidualPlots(actualValues, predictedValues, residuals);
+                HasTrainingResults = true;
+            }
+        }
+
 
 
 
@@ -143,6 +188,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             OnPropertyChanged(nameof(IsConfusionMatrixAvailable));
             OnPropertyChanged(nameof(IsRocCurveAvailable));
             OnPropertyChanged(nameof(IsPrecisionRecallCurveAvailable));
+            OnPropertyChanged(nameof(IsFeatureImportanceAvailable));
+            OnPropertyChanged(nameof(IsResidualPlotAvailable));
 
 
             if (!IsConfusionMatrixAvailable)
@@ -159,6 +206,13 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             {
                 PrecisionRecallCurve.Clear();
             }
+
+            if (!IsResidualPlotAvailable)
+            {
+                ResidualPlot.Clear();
+            }
+
+            // Feature importance is always available, no need to clear
         }
 
 
@@ -169,6 +223,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             ConfusionMatrix.Clear();
             RocCurve.Clear();
             PrecisionRecallCurve.Clear();
+            FeatureImportance.Clear();
+            ResidualPlot.Clear();
             HasTrainingResults = false;
             SelectedVisualizationIndex = 0;
         }
@@ -190,6 +246,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 ConfusionMatrix?.Dispose();
                 RocCurve?.Dispose();
                 PrecisionRecallCurve?.Dispose();
+                FeatureImportance?.Dispose();
+                ResidualPlot?.Dispose();
             }
             base.Dispose(disposing);
         }

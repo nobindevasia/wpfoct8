@@ -71,6 +71,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<ConfusionMatrixViewModel>();
             services.AddTransient<RocCurveViewModel>();
             services.AddTransient<PrecisionRecallCurveViewModel>();
+            services.AddTransient<FeatureImportanceViewModel>();
+            services.AddTransient<ResidualPlotViewModel>();
             services.AddTransient<PostTrainingVisualizationsViewModel>();
 
             services.AddTransient<MainWindowViewModel>();

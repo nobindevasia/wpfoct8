@@ -4,7 +4,7 @@ using D2G.Iris.ML.Core.Interfaces;
 using D2G.Iris.ML.Core.Models;
 using D2G.Iris.ML.DataBalancing;
 
-namespace D2G.Iris.ML.DataBalancing
+namespace D2G.Iris.ML.DataBalancing 
 {
     public class DataBalancerFactory : IDataBalancerFactory
     {

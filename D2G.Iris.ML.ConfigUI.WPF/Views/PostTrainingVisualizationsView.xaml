@@ -154,34 +154,24 @@
                 </TabItem>
 
 
-                <TabItem Header="Residual Plot" IsEnabled="False" Visibility="Collapsed">
+                <TabItem Header="Residual Plot"
+                         Visibility="{Binding IsResidualPlotAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
                             BorderThickness="1,0,1,1"
                             CornerRadius="0,6,6,6">
-                        <Grid>
-                            <TextBlock Text="Residual plot visualization will be available here"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="16"
-                                       Foreground="#95A5A6"/>
-                        </Grid>
+                        <views:ResidualPlotView DataContext="{Binding ResidualPlot}"/>
                     </Border>
                 </TabItem>
 
 
-                <TabItem Header="Feature Importance" IsEnabled="False" Visibility="Collapsed">
+                <TabItem Header="Feature Importance"
+                         Visibility="{Binding IsFeatureImportanceAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Border Background="White"
                             BorderBrush="#BDC3C7"
                             BorderThickness="1,0,1,1"
                             CornerRadius="0,6,6,6">
-                        <Grid>
-                            <TextBlock Text="Feature importance visualization will be available here"
-                                       HorizontalAlignment="Center"
-                                       VerticalAlignment="Center"
-                                       FontSize="16"
-                                       Foreground="#95A5A6"/>
-                        </Grid>
+                        <views:FeatureImportanceView DataContext="{Binding FeatureImportance}"/>
                     </Border>
                 </TabItem>
             </TabControl>

@@ -62,48 +62,118 @@
                           SelectedItem="{Binding ModelType}"
                           VerticalAlignment="Center" Height="25"/>
 
-                
-                <Label Grid.Row="2" Grid.Column="0" Content="Target Field:" VerticalAlignment="Center" FontWeight="Bold"/>
-                <TextBox Grid.Row="2" Grid.Column="1" 
-                         Text="{Binding TargetField, UpdateSourceTrigger=PropertyChanged}" 
-                         VerticalAlignment="Center" Height="25"/>
 
-                
-                <Label Grid.Row="4" Grid.Column="0" Content="Training Mode:" VerticalAlignment="Center" FontWeight="Bold"/>
-                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
-                    <RadioButton Content="Traditional Training" 
-                                 IsChecked="{Binding UseTraditionalTraining}" 
+                <Label Grid.Row="2" Grid.Column="0" Content="Target Field:" VerticalAlignment="Center" FontWeight="Bold"
+                       Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <TextBox Grid.Row="2" Grid.Column="1"
+                         Text="{Binding TargetField, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25"
+                         Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+
+                <Label Grid.Row="4" Grid.Column="0" Content="Training Mode:" VerticalAlignment="Center" FontWeight="Bold"
+                       Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal"
+                            Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <RadioButton Content="Traditional Training"
+                                 IsChecked="{Binding UseTraditionalTraining}"
                                  GroupName="TrainingMode"
                                  VerticalAlignment="Center" Margin="0,0,20,0"/>
-                    <RadioButton Content="AutoML" 
-                                 IsChecked="{Binding UseAutoML}" 
+                    <RadioButton Content="AutoML"
+                                 IsChecked="{Binding UseAutoML}"
                                  GroupName="TrainingMode"
                                  VerticalAlignment="Center"/>
                 </StackPanel>
 
-                
-                <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2" 
-                           Text="{Binding TrainingModeDescription}" 
-                           TextWrapping="Wrap" 
+
+                <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+                           Text="{Binding TrainingModeDescription}"
+                           TextWrapping="Wrap"
                            Foreground="DarkBlue"
                            FontStyle="Italic"
-                           Margin="0,5"/>
+                           Margin="0,5"
+                           Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}"/>
 
+
+                <!-- Clustering Parameters (shown only for Clustering model type) -->
+                <GroupBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2"
+                          Header="Clustering Parameters"
+                          Visibility="{Binding IsClustering, Converter={StaticResource BooleanToVisibilityConverter}}"
+                          Margin="0,5">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="15"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Number of Clusters (K) -->
+                        <Label Grid.Row="0" Grid.Column="0" Content="Number of Clusters (K):" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal">
+                            <TextBox Text="{Binding NumberOfClusters, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToIntConverter}}"
+                                     VerticalAlignment="Center" Height="25" Width="80"/>
+                            <Label Content="(2-20 clusters)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray" FontSize="11"/>
+                        </StackPanel>
+
+                        <!-- Max Iterations -->
+                        <Label Grid.Row="2" Grid.Column="0" Content="Max Iterations:" VerticalAlignment="Center"/>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                            <TextBox Text="{Binding MaxClusteringIterations, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToIntConverter}}"
+                                     VerticalAlignment="Center" Height="25" Width="80"/>
+                            <Label Content="(10-1000 iterations)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray" FontSize="11"/>
+                        </StackPanel>
+
+                        <!-- Normalization -->
+                        <CheckBox Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                                  Content="Use Feature Normalization (Recommended)"
+                                  IsChecked="{Binding UseClusteringNormalization}"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Normalizes features to have similar scales, improving clustering quality"/>
+
+                        <!-- Description -->
+                        <TextBlock Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+                                   Text="K-Means clustering will partition your data into distinct groups. Data points within the same cluster will be more similar to each other than to points in other clusters."
+                                   TextWrapping="Wrap"
+                                   Foreground="DarkBlue"
+                                   Margin="0,10,0,0"/>
+                    </Grid>
+                </GroupBox>
 
                 <Label Grid.Row="10" Grid.Column="0" Content="Test Percentage:" VerticalAlignment="Center"
-                       Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                       Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                 <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal"
-                            Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            Visibility="{Binding IsNotClustering, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <TextBox Text="{Binding TestFraction, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource StringToDecimalConverter}}"
                              VerticalAlignment="Center" Height="25" Width="80"/>
                     <Label Content="%" VerticalAlignment="Center" Margin="5,0,0,0"/>
                 </StackPanel>
 
-                
-                <GroupBox Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="2" 
+
+                <GroupBox Grid.Row="12" Grid.Column="0" Grid.ColumnSpan="2"
                           Header="Traditional Training Settings"
-                          Visibility="{Binding UseTraditionalTraining, Converter={StaticResource BooleanToVisibilityConverter}}"
                           Margin="0,5">
+                    <GroupBox.Style>
+                        <Style TargetType="GroupBox">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding UseTraditionalTraining}" Value="True"/>
+                                        <Condition Binding="{Binding IsNotClustering}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </GroupBox.Style>
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -290,11 +360,24 @@
                     </Grid>
                 </GroupBox>
 
-                
-                <GroupBox Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2" 
+
+                <GroupBox Grid.Row="14" Grid.Column="0" Grid.ColumnSpan="2"
                           Header="AutoML Settings"
-                          Visibility="{Binding UseAutoML, Converter={StaticResource BooleanToVisibilityConverter}}"
                           Margin="0,5">
+                    <GroupBox.Style>
+                        <Style TargetType="GroupBox">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding UseAutoML}" Value="True"/>
+                                        <Condition Binding="{Binding IsNotClustering}" Value="True"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </GroupBox.Style>
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>

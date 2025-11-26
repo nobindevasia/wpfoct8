@@ -99,11 +99,15 @@ namespace D2G.Iris.ML.Data
                     }
                 }
 
-                if (!processedData.Schema.GetColumnOrNull(config.TargetField).HasValue &&
-                    processedData.Schema.GetColumnOrNull("Label").HasValue)
+                // Only check/copy label column for supervised learning (not clustering)
+                if (!string.IsNullOrWhiteSpace(config.TargetField))
                 {
-                    var labelPipeline = mlContext.Transforms.CopyColumns(config.TargetField, "Label");
-                    processedData = labelPipeline.Fit(processedData).Transform(processedData);
+                    if (!processedData.Schema.GetColumnOrNull(config.TargetField).HasValue &&
+                        processedData.Schema.GetColumnOrNull("Label").HasValue)
+                    {
+                        var labelPipeline = mlContext.Transforms.CopyColumns(config.TargetField, "Label");
+                        processedData = labelPipeline.Fit(processedData).Transform(processedData);
+                    }
                 }
 
                 if (_sqlHandler != null && !string.IsNullOrEmpty(config.Database.OutputTableName))

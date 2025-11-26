@@ -23,6 +23,7 @@ namespace D2G.Iris.ML.Training
                 ModelType.BinaryClassification => new BinaryClassificationTrainer(_mlContext, _trainerFactory),
                 ModelType.MultiClassClassification => new MultiClassClassificationTrainer(_mlContext, _trainerFactory),
                 ModelType.Regression => new RegressionTrainer(_mlContext, _trainerFactory),
+                ModelType.Clustering => new ClusteringTrainer(_mlContext, _trainerFactory),
                 _ => throw new ArgumentException($"Unsupported model type: {modelType}")
             };
         }

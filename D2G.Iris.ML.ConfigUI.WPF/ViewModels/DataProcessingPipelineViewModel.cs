@@ -238,6 +238,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 _featureEngineeringViewModel.Dispose();
             }
             base.Dispose(disposing);
+
         }
     }
 }

@@ -232,7 +232,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
                 throw new InvalidOperationException($"Error previewing table data: {ex.Message}", ex);
             }
         }
-
+        
         public long GetTableRowCount(DatabaseConfig config, string tableName)
         {
             try
@@ -293,5 +293,4 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             }
         }
     }
-
 }

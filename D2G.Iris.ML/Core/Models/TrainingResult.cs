@@ -30,5 +30,11 @@ namespace D2G.Iris.ML.Core.Models
         public List<double> ActualValues { get; set; }
         public List<double> PredictedValues { get; set; }
         public List<double> Residuals { get; set; }
+
+        // Clustering-specific data
+        public List<uint> ClusterAssignments { get; set; }
+        public List<float[]> ClusterCentroids { get; set; }
+        public Dictionary<int, int> ClusterSizes { get; set; }
+        public List<float[]> DataPoints { get; set; } // For visualization
     }
 }

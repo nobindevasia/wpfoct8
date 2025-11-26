@@ -2,6 +2,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using D2G.Iris.ML.Core.Enums;
 using D2G.Iris.ML.Core.Models;
 
 namespace D2G.Iris.ML.ConfigUI.WPF.Services
@@ -77,8 +78,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.Services
             if (config == null)
                 return false;
 
-            if (string.IsNullOrWhiteSpace(config.TargetField))
-                return false;
+            // Target field is only required for supervised learning (not clustering)
+            if (config.ModelType != ModelType.Clustering)
+            {
+                if (string.IsNullOrWhiteSpace(config.TargetField))
+                    return false;
+            }
 
             if (config.Database == null)
                 return false;

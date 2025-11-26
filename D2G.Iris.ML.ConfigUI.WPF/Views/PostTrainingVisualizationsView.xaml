@@ -4,11 +4,13 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:views="clr-namespace:D2G.Iris.ML.ConfigUI.WPF.Views"
+             xmlns:converters="clr-namespace:D2G.Iris.ML.ConfigUI.WPF.Converters"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="900">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
     </UserControl.Resources>
 
     <Grid>
@@ -172,6 +174,17 @@
                             BorderThickness="1,0,1,1"
                             CornerRadius="0,6,6,6">
                         <views:FeatureImportanceView DataContext="{Binding FeatureImportance}"/>
+                    </Border>
+                </TabItem>
+
+                <!-- Cluster Visualization Tab -->
+                <TabItem Header="Cluster Visualization"
+                         Visibility="{Binding IsClusterVisualizationAvailable, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <Border Background="White"
+                            BorderBrush="#BDC3C7"
+                            BorderThickness="1,0,1,1"
+                            CornerRadius="0,6,6,6">
+                        <views:ClusterVisualizationView DataContext="{Binding ClusterVisualization}"/>
                     </Border>
                 </TabItem>
             </TabControl>

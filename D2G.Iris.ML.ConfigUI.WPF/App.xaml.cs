@@ -53,6 +53,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<DataBalancingViewModel>();
             services.AddTransient<FeatureEngineeringViewModel>();
             services.AddTransient<AutoMLSettingsViewModel>();
+            services.AddTransient<ClusteringParametersViewModel>();
             services.AddTransient<DataProcessingPipelineViewModel>();
             services.AddTransient<TrainingLogsViewModel>();
 
@@ -73,6 +74,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF
             services.AddTransient<PrecisionRecallCurveViewModel>();
             services.AddTransient<FeatureImportanceViewModel>();
             services.AddTransient<ResidualPlotViewModel>();
+            services.AddTransient<ClusterVisualizationViewModel>();
             services.AddTransient<PostTrainingVisualizationsViewModel>();
 
             services.AddTransient<MainWindowViewModel>();

@@ -33,6 +33,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         private ModelType _modelType = ModelType.BinaryClassification;
         private string _targetField = "Label";
 
+        // Clustering specific properties
+        private int _numberOfClusters = 3;
+        private int _maxClusteringIterations = 100;
+        private bool _useClusteringNormalization = true;
+
         public event Action<ModelType>? ModelTypeChanged;
 
         public TrainingParametersViewModel(IDialogService dialogService)
@@ -150,8 +155,32 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     UpdateAvailableAlgorithms();
                     UpdateAvailableMetrics();
                     Parameters.Clear();
+                    OnPropertyChanged(nameof(IsClustering));
+                    OnPropertyChanged(nameof(IsNotClustering));
                 }
             }
+        }
+
+        public bool IsClustering => _modelType == ModelType.Clustering;
+        public bool IsNotClustering => _modelType != ModelType.Clustering;
+
+        // Clustering parameters
+        public int NumberOfClusters
+        {
+            get => _numberOfClusters;
+            set => SetProperty(ref _numberOfClusters, Math.Max(2, Math.Min(20, value)));
+        }
+
+        public int MaxClusteringIterations
+        {
+            get => _maxClusteringIterations;
+            set => SetProperty(ref _maxClusteringIterations, Math.Max(10, Math.Min(1000, value)));
+        }
+
+        public bool UseClusteringNormalization
+        {
+            get => _useClusteringNormalization;
+            set => SetProperty(ref _useClusteringNormalization, value);
         }
 
         public string TargetField
@@ -226,6 +255,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                     foreach (var metric in new[] { "RSquared", "MeanAbsoluteError", "RootMeanSquaredError" })
                         AvailableMetrics.Add(metric);
                     OptimizingMetric = "RSquared";
+                    break;
+                case ModelType.Clustering:
+                    foreach (var metric in new[] { "SilhouetteScore", "DaviesBouldinIndex" })
+                        AvailableMetrics.Add(metric);
+                    OptimizingMetric = "SilhouetteScore";
                     break;
             }
         }
@@ -320,7 +354,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         }
 
 
-        public void SetConfiguration(TrainingParameters? parameters, AutoMLConfig? autoMLConfig, ModelType modelType, string targetField)
+        public void SetConfiguration(TrainingParameters? parameters, AutoMLConfig? autoMLConfig, ModelType modelType, string targetField, ClusteringConfig? clusteringConfig = null)
         {
             ModelType = modelType;
             TargetField = targetField ?? "Label";
@@ -344,6 +378,20 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 UseCrossValidation = false;
                 NumberOfFolds = 5;
                 AutoMLSeed = string.Empty;
+            }
+
+            // Load clustering configuration
+            if (clusteringConfig != null)
+            {
+                NumberOfClusters = clusteringConfig.NumberOfClusters;
+                MaxClusteringIterations = clusteringConfig.MaxIterations;
+                UseClusteringNormalization = clusteringConfig.UseNormalization;
+            }
+            else
+            {
+                NumberOfClusters = 3;
+                MaxClusteringIterations = 100;
+                UseClusteringNormalization = true;
             }
 
             if (parameters == null) return;
@@ -380,7 +428,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             }
         }
 
-        public (TrainingParameters trainingParams, AutoMLConfig autoMLConfig, ModelType modelType, string targetField) GetConfiguration()
+        public (TrainingParameters trainingParams, AutoMLConfig autoMLConfig, ModelType modelType, string targetField, ClusteringConfig clusteringConfig) GetConfiguration()
         {
             var algorithmParameters = new Dictionary<string, object>();
             foreach (var param in Parameters)
@@ -417,7 +465,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 Seed = seedValue
             };
 
-            return (trainingParams, autoMLConfig, ModelType, TargetField);
+            var clusteringConfig = new ClusteringConfig
+            {
+                NumberOfClusters = NumberOfClusters,
+                MaxIterations = MaxClusteringIterations,
+                UseNormalization = UseClusteringNormalization,
+                Algorithm = "kmeans"
+            };
+
+            return (trainingParams, autoMLConfig, ModelType, TargetField, clusteringConfig);
         }
     }
 }

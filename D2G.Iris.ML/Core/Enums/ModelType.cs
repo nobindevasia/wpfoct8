@@ -10,6 +10,7 @@ namespace D2G.Iris.ML.Core.Enums
     {
         BinaryClassification = 0,
         MultiClassClassification = 1,
-        Regression = 2
+        Regression = 2,
+        Clustering = 3
     }
 }

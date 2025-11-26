@@ -1,0 +1,66 @@
+<UserControl x:Class="D2G.Iris.ML.ConfigUI.WPF.Views.ClusteringParametersView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="450" d:DesignWidth="600">
+
+    <GroupBox Header="Clustering Parameters" Margin="10">
+        <Grid Margin="15">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="15"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="180"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+         
+            <Label Grid.Row="0" Grid.Column="0" Content="Algorithm:" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="0" Grid.Column="1"
+                      ItemsSource="{Binding AvailableAlgorithms}"
+                      SelectedItem="{Binding Algorithm}"
+                      VerticalAlignment="Center" Height="25" Width="200" HorizontalAlignment="Left"/>
+
+           
+            <Label Grid.Row="2" Grid.Column="0" Content="Number of Clusters (K):" VerticalAlignment="Center"/>
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding NumberOfClusters, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25" Width="80"/>
+                <Label Content="(2-20 clusters)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray" FontSize="11"/>
+            </StackPanel>
+
+           
+            <Label Grid.Row="4" Grid.Column="0" Content="Max Iterations:" VerticalAlignment="Center"/>
+            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal">
+                <TextBox Text="{Binding MaxIterations, UpdateSourceTrigger=PropertyChanged}"
+                         VerticalAlignment="Center" Height="25" Width="80"/>
+                <Label Content="(10-1000 iterations)" VerticalAlignment="Center" Margin="5,0,0,0" Foreground="Gray" FontSize="11"/>
+            </StackPanel>
+
+           
+            <CheckBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"
+                      Content="Use Feature Normalization (Recommended)"
+                      IsChecked="{Binding UseNormalization}"
+                      VerticalAlignment="Center"
+                      ToolTip="Normalizes features to have similar scales, improving clustering quality"/>
+
+      
+            <TextBlock Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="2"
+                       Text="{Binding Description}"
+                       TextWrapping="Wrap"
+                       Foreground="DarkBlue"
+                       Margin="0,10,0,0"/>
+        </Grid>
+    </GroupBox>
+</UserControl>

@@ -526,7 +526,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 _currentConfig.TrainingParameters,
                 _currentConfig.AutoML,
                 _currentConfig.ModelType,
-                _currentConfig.TargetField);
+                _currentConfig.TargetField,
+                _currentConfig.Clustering);
             DataProcessingPipeline.LoadFromConfig(_currentConfig);
         }
 
@@ -538,11 +539,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             _currentConfig.Database = DatabaseSettings.GetConfiguration();
             _currentConfig.InputFields = InputFields.GetConfiguration();
 
-            var (trainingParams, autoMLConfig, modelType, targetField) = TrainingParameters.GetConfiguration();
+            var (trainingParams, autoMLConfig, modelType, targetField, clusteringConfig) = TrainingParameters.GetConfiguration();
             _currentConfig.TrainingParameters = trainingParams;
             _currentConfig.AutoML = autoMLConfig;
             _currentConfig.ModelType = modelType;
             _currentConfig.TargetField = targetField;
+            _currentConfig.Clustering = clusteringConfig;
 
             DataProcessingPipeline.SaveToConfig(_currentConfig);
         }
@@ -673,6 +675,17 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                         trainingResult.PredictedValues,
                         trainingResult.Residuals);
                     TrainingLogs.LogMessage($"Residual plot visualization updated ({trainingResult.ActualValues.Count} data points)", "Info");
+                }
+            }
+            else if (modelType == ModelType.Clustering && trainingResult.Metrics is Core.Models.ClusteringMetrics clusteringMetrics)
+            {
+                // Update Cluster Visualization for clustering
+                if (trainingResult.ClusterAssignments != null && trainingResult.DataPoints != null &&
+                    trainingResult.ClusterAssignments.Count > 0 && trainingResult.DataPoints.Count > 0)
+                {
+                    PostTrainingVisualizations.ClusterVisualization.UpdateClusterVisualization(trainingResult);
+                    PostTrainingVisualizations.HasTrainingResults = true;
+                    TrainingLogs.LogMessage($"Cluster visualization updated ({trainingResult.ClusterAssignments.Count} data points, {clusteringMetrics.NumberOfClusters} clusters)", "Info");
                 }
             }
         }

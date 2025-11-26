@@ -65,8 +65,11 @@ namespace D2G.Iris.ML.Data
                 }
             }
 
-            var allCols = featureColumns.Concat(new[] { targetColumn })
-                                        .Select(c => c.Contains('[') ? c : $"[{c}]");
+            // For clustering, we don't have a target column
+            var allCols = string.IsNullOrWhiteSpace(targetColumn)
+                ? featureColumns.Select(c => c.Contains('[') ? c : $"[{c}]")
+                : featureColumns.Concat(new[] { targetColumn })
+                                .Select(c => c.Contains('[') ? c : $"[{c}]");
             var sql = $"SELECT {string.Join(", ", allCols)} FROM {fullTableName}" +
                       (!string.IsNullOrWhiteSpace(whereSyntax)
                             ? $" WHERE {whereSyntax}" : string.Empty);
@@ -82,18 +85,22 @@ namespace D2G.Iris.ML.Data
                 ));
             }
 
-            DbType labelDbType = modelType switch
+            // Only add target column for supervised learning (not clustering)
+            if (!string.IsNullOrWhiteSpace(targetColumn))
             {
-                ModelType.BinaryClassification => DbType.Int64,
-                ModelType.MultiClassClassification => DbType.Int64,
-                ModelType.Regression => DbType.Single,
-                _ => DbType.Int64
-            };
-            loaderCols.Add(new DatabaseLoader.Column(
-                name: targetColumn,
-                dbType: labelDbType,
-                index: idx
-            ));
+                DbType labelDbType = modelType switch
+                {
+                    ModelType.BinaryClassification => DbType.Int64,
+                    ModelType.MultiClassClassification => DbType.Int64,
+                    ModelType.Regression => DbType.Single,
+                    _ => DbType.Int64
+                };
+                loaderCols.Add(new DatabaseLoader.Column(
+                    name: targetColumn,
+                    dbType: labelDbType,
+                    index: idx
+                ));
+            }
             var dbLoader = _mlContext.Data.CreateDatabaseLoader(loaderCols.ToArray());
             var dbSource = new DatabaseSource(
                 providerFactory: SqlClientFactory.Instance,

@@ -16,6 +16,7 @@ namespace D2G.Iris.ML.Core.Models
         public DataBalancingConfig DataBalancing { get; set; } = new DataBalancingConfig();
         public string TargetField { get; set; }
         public AutoMLConfig AutoML { get; set; }
+        public ClusteringConfig Clustering { get; set; } = new ClusteringConfig();
 
         public Dictionary<string, object>? ExtendedProperties { get; set; } = new Dictionary<string, object>();
     }

@@ -158,6 +158,10 @@ namespace D2G.Iris.ML.Utils
                     "Sdca",
                     "FastTreeTweedie",
                     "LbfgsPoissonRegression"
+                },
+                [ModelType.Clustering] = new List<string>
+                {
+                    "KMeans"
                 }
             };
 

@@ -293,7 +293,10 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 OutlierResults.Clear();
                 SummaryResults.Clear();
 
-                var numericColumns = _columns.Where(c => !string.IsNullOrEmpty(_targetColumn) && !c.Equals(_targetColumn, StringComparison.OrdinalIgnoreCase)).ToArray();
+                // Get all columns, excluding target column if specified (for clustering, target is empty so include all)
+                var numericColumns = _columns.Where(c =>
+                    string.IsNullOrEmpty(_targetColumn) || !c.Equals(_targetColumn, StringComparison.OrdinalIgnoreCase)
+                ).ToArray();
 
                 if (!numericColumns.Any())
                 {

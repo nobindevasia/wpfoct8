@@ -15,13 +15,15 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             RocCurveViewModel rocCurveViewModel,
             PrecisionRecallCurveViewModel precisionRecallCurveViewModel,
             FeatureImportanceViewModel featureImportanceViewModel,
-            ResidualPlotViewModel residualPlotViewModel)
+            ResidualPlotViewModel residualPlotViewModel,
+            ClusterVisualizationViewModel clusterVisualizationViewModel)
         {
             ConfusionMatrix = confusionMatrixViewModel;
             RocCurve = rocCurveViewModel;
             PrecisionRecallCurve = precisionRecallCurveViewModel;
             FeatureImportance = featureImportanceViewModel;
             ResidualPlot = residualPlotViewModel;
+            ClusterVisualization = clusterVisualizationViewModel;
             _currentModelType = ModelType.BinaryClassification;
         }
 
@@ -36,6 +38,8 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         public FeatureImportanceViewModel FeatureImportance { get; }
 
         public ResidualPlotViewModel ResidualPlot { get; }
+
+        public ClusterVisualizationViewModel ClusterVisualization { get; }
 
         public int SelectedVisualizationIndex
         {
@@ -90,6 +94,12 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
         /// </summary>
         public bool IsResidualPlotAvailable =>
             CurrentModelType == ModelType.Regression;
+
+        /// <summary>
+        /// Cluster visualization is only available for clustering
+        /// </summary>
+        public bool IsClusterVisualizationAvailable =>
+            CurrentModelType == ModelType.Clustering;
 
         #endregion
 
@@ -190,6 +200,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             OnPropertyChanged(nameof(IsPrecisionRecallCurveAvailable));
             OnPropertyChanged(nameof(IsFeatureImportanceAvailable));
             OnPropertyChanged(nameof(IsResidualPlotAvailable));
+            OnPropertyChanged(nameof(IsClusterVisualizationAvailable));
 
 
             if (!IsConfusionMatrixAvailable)
@@ -212,6 +223,11 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 ResidualPlot.Clear();
             }
 
+            if (!IsClusterVisualizationAvailable)
+            {
+                ClusterVisualization.Clear();
+            }
+
             // Feature importance is always available, no need to clear
         }
 
@@ -225,6 +241,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
             PrecisionRecallCurve.Clear();
             FeatureImportance.Clear();
             ResidualPlot.Clear();
+            ClusterVisualization.Clear();
             HasTrainingResults = false;
             SelectedVisualizationIndex = 0;
         }
@@ -248,6 +265,7 @@ namespace D2G.Iris.ML.ConfigUI.WPF.ViewModels
                 PrecisionRecallCurve?.Dispose();
                 FeatureImportance?.Dispose();
                 ResidualPlot?.Dispose();
+                ClusterVisualization?.Dispose();
             }
             base.Dispose(disposing);
         }
